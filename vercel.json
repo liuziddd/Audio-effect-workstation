@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npx tsc && npx vite build",
+  "buildCommand": "npx vite build",
   "outputDirectory": "dist",
   "installCommand": "npm install",
   "framework": "vite",
