@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>音频文件分析工具</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: white;
+        }
+
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #333;
+            border-radius: 8px;
+            background: #2a2a2a;
+        }
+
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            background: #007acc;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #005a99;
+        }
+
+        button:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+
+        input[type="file"] {
+            margin: 10px 0;
+            padding: 10px;
+            background: #333;
+            color: white;
+            border: 1px solid #555;
+            border-radius: 4px;
+            width: 100%;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 10px;
+            margin: 10px 0;
+        }
+
+        .info-label {
+            font-weight: bold;
+            color: #74c0fc;
+        }
+
+        .info-value {
+            font-family: monospace;
+            background: #333;
+            padding: 5px;
+            border-radius: 3px;
+        }
+
+        .error {
+            color: #ff6b6b;
+            background: #4a1a1a;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+
+        .success {
+            color: #51cf66;
+            background: #1a4a1a;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+
+        .warning {
+            color: #ffd43b;
+            background: #4a4a1a;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+
+        .hex-view {
+            font-family: monospace;
+            font-size: 12px;
+            background: #333;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            line-height: 1.4;
+        }
+
+        .recommendation {
+            background: #1a3a4a;
+            border: 1px solid #007acc;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🔍 音频文件深度分析工具</h1>
+    <p>这个工具会详细分析您的音频文件，找出为什么浏览器无法播放它。</p>
+
+    <div class="section">
+        <h2>📁 选择音频文件</h2>
+        <input type="file" id="audioFile" accept="audio/*">
+        <button id="analyzeBtn" disabled>开始分析</button>
+    </div>
+
+    <div class="section" id="basicInfo" style="display: none;">
+        <h2>📋 基本信息</h2>
+        <div class="info-grid" id="basicInfoGrid"></div>
+    </div>
+
+    <div class="section" id="browserSupport" style="display: none;">
+        <h2>🌐 浏览器支持检查</h2>
+        <div id="supportResults"></div>
+    </div>
+
+    <div class="section" id="fileHeader" style="display: none;">
+        <h2>🔢 文件头分析</h2>
+        <div id="headerAnalysis"></div>
+        <details>
+            <summary>查看原始字节数据（前64字节）</summary>
+            <div class="hex-view" id="hexData"></div>
+        </details>
+    </div>
+
+    <div class="section" id="playabilityTest" style="display: none;">
+        <h2>🧪 播放能力测试</h2>
+        <div id="testResults"></div>
+        <audio id="testAudio" controls style="width: 100%; margin-top: 10px; display: none;"></audio>
+    </div>
+
+    <div class="section" id="recommendations" style="display: none;">
+        <h2>💡 解决建议</h2>
+        <div id="solutionList"></div>
+    </div>
+
+    <script>
+        const audioFile = document.getElementById('audioFile');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const testAudio = document.getElementById('testAudio');
+
+        let currentFile = null;
+
+        audioFile.addEventListener('change', (e) => {
+            currentFile = e.target.files[0];
+            analyzeBtn.disabled = !currentFile;
+        });
+
+        analyzeBtn.addEventListener('click', async () => {
+            if (!currentFile) return;
+
+            analyzeBtn.disabled = true;
+            analyzeBtn.textContent = '分析中...';
+
+            try {
+                await analyzeFile(currentFile);
+            } catch (error) {
+                console.error('分析失败:', error);
+                showError('文件分析失败: ' + error.message);
+            } finally {
+                analyzeBtn.disabled = false;
+                analyzeBtn.textContent = '开始分析';
+            }
+        });
+
+        async function analyzeFile(file) {
+            // 1. 基本信息
+            showBasicInfo(file);
+
+            // 2. 浏览器支持检查
+            showBrowserSupport();
+
+            // 3. 文件头分析
+            await analyzeFileHeader(file);
+
+            // 4. 播放能力测试
+            await testPlayability(file);
+
+            // 5. 生成建议
+            generateRecommendations(file);
+        }
+
+        function showBasicInfo(file) {
+            const section = document.getElementById('basicInfo');
+            const grid = document.getElementById('basicInfoGrid');
+
+            const extension = file.name.split('.').pop().toLowerCase();
+
+            grid.innerHTML = `
+                <div class="info-label">文件名:</div>
+                <div class="info-value">${file.name}</div>
+                <div class="info-label">大小:</div>
+                <div class="info-value">${formatFileSize(file.size)}</div>
+                <div class="info-label">MIME类型:</div>
+                <div class="info-value">${file.type || '未知'}</div>
+                <div class="info-label">扩展名:</div>
+                <div class="info-value">.${extension}</div>
+                <div class="info-label">最后修改:</div>
+                <div class="info-value">${new Date(file.lastModified).toLocaleString()}</div>
+            `;
+
+            section.style.display = 'block';
+        }
+
+        function showBrowserSupport() {
+            const section = document.getElementById('browserSupport');
+            const results = document.getElementById('supportResults');
+
+            const audio = new Audio();
+            const formats = [
+                { name: 'WAV (PCM)', mime: 'audio/wav', common: true },
+                { name: 'WAV (generic)', mime: 'audio/wave', common: false },
+                { name: 'WAV (x-wav)', mime: 'audio/x-wav', common: false },
+                { name: 'MP3', mime: 'audio/mpeg', common: true },
+                { name: 'OGG', mime: 'audio/ogg', common: true },
+                { name: 'AAC', mime: 'audio/aac', common: true },
+                { name: 'M4A', mime: 'audio/mp4', common: true },
+                { name: 'WebM', mime: 'audio/webm', common: false },
+                { name: 'FLAC', mime: 'audio/flac', common: false }
+            ];
+
+            let html = '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">';
+
+            formats.forEach(format => {
+                const support = audio.canPlayType(format.mime);
+                const icon = support ? '✅' : '❌';
+                const level = support === 'probably' ? '完全支持' :
+                    support === 'maybe' ? '可能支持' : '不支持';
+                const className = support ? 'success' : 'error';
+
+                html += `<div class="${className}" style="padding: 8px; border-radius: 4px;">
+                    ${icon} ${format.name}<br>
+                    <small>${level}</small>
+                </div>`;
+            });
+
+            html += '</div>';
+            results.innerHTML = html;
+            section.style.display = 'block';
+        }
+
+        async function analyzeFileHeader(file) {
+            const section = document.getElementById('fileHeader');
+            const analysis = document.getElementById('headerAnalysis');
+            const hexData = document.getElementById('hexData');
+
+            try {
+                // 读取前64字节
+                const buffer = await readFileBytes(file, 0, 64);
+                const bytes = new Uint8Array(buffer);
+
+                // 显示十六进制数据
+                let hexStr = '';
+                let asciiStr = '';
+                for (let i = 0; i < bytes.length; i += 16) {
+                    const hexLine = Array.from(bytes.slice(i, i + 16))
+                        .map(b => b.toString(16).padStart(2, '0'))
+                        .join(' ');
+                    const asciiLine = Array.from(bytes.slice(i, i + 16))
+                        .map(b => b >= 32 && b <= 126 ? String.fromCharCode(b) : '.')
+                        .join('');
+                    hexStr += `${i.toString(16).padStart(4, '0')}: ${hexLine.padEnd(47)} |${asciiLine}|\n`;
+                }
+                hexData.textContent = hexStr;
+
+                // 分析文件格式
+                const formatInfo = analyzeFormat(bytes);
+                analysis.innerHTML = formatInfo;
+
+            } catch (error) {
+                analysis.innerHTML = `<div class="error">无法读取文件头: ${error.message}</div>`;
+            }
+
+            section.style.display = 'block';
+        }
+
+        function analyzeFormat(bytes) {
+            const header = Array.from(bytes.slice(0, 12)).map(b => String.fromCharCode(b)).join('');
+
+            if (header.startsWith('RIFF') && header.includes('WAVE')) {
+                return analyzeWAVFormat(bytes);
+            } else if (bytes[0] === 0xFF && (bytes[1] & 0xF0) === 0xF0) {
+                return '<div class="success">✅ 这是一个MP3文件</div>';
+            } else if (header.startsWith('OggS')) {
+                return '<div class="success">✅ 这是一个OGG文件</div>';
+            } else if (header.startsWith('ftyp')) {
+                return '<div class="success">✅ 这是一个MP4/M4A文件</div>';
+            } else {
+                return '<div class="error">❌ 无法识别的音频格式</div>';
+            }
+        }
+
+        function analyzeWAVFormat(bytes) {
+            try {
+                // 读取WAV头信息
+                const view = new DataView(bytes.buffer);
+                const fileSize = view.getUint32(4, true);
+                const formatChunkSize = view.getUint32(16, true);
+                const audioFormat = view.getUint16(20, true);
+                const channels = view.getUint16(22, true);
+                const sampleRate = view.getUint32(24, true);
+                const byteRate = view.getUint32(28, true);
+                const blockAlign = view.getUint16(32, true);
+                const bitsPerSample = view.getUint16(34, true);
+
+                let formatName = 'Unknown';
+                let compatible = false;
+
+                switch (audioFormat) {
+                    case 1:
+                        formatName = 'PCM (未压缩)';
+                        compatible = bitsPerSample === 16 || bitsPerSample === 24;
+                        break;
+                    case 3:
+                        formatName = 'IEEE Float (浮点)';
+                        compatible = false;
+                        break;
+                    case 6:
+                        formatName = 'A-law';
+                        compatible = false;
+                        break;
+                    case 7:
+                        formatName = 'μ-law';
+                        compatible = false;
+                        break;
+                    case 85:
+                        formatName = 'MPEG Layer 3';
+                        compatible = false;
+                        break;
+                    default:
+                        formatName = `压缩格式 (${audioFormat})`;
+                        compatible = false;
+                }
+
+                const className = compatible ? 'success' : 'warning';
+                const icon = compatible ? '✅' : '⚠️';
+
+                return `
+                    <div class="${className}">
+                        ${icon} WAV文件格式分析:
+                        <div class="info-grid" style="margin-top: 10px;">
+                            <div class="info-label">音频格式:</div>
+                            <div class="info-value">${formatName}</div>
+                            <div class="info-label">声道数:</div>
+                            <div class="info-value">${channels} (${channels === 1 ? '单声道' : channels === 2 ? '立体声' : '多声道'})</div>
+                            <div class="info-label">采样率:</div>
+                            <div class="info-value">${sampleRate} Hz</div>
+                            <div class="info-label">位深度:</div>
+                            <div class="info-value">${bitsPerSample} bit</div>
+                            <div class="info-label">比特率:</div>
+                            <div class="info-value">${Math.round(byteRate * 8 / 1000)} kbps</div>
+                            <div class="info-label">浏览器兼容性:</div>
+                            <div class="info-value">${compatible ? '良好' : '可能有问题'}</div>
+                        </div>
+                    </div>
+                    ${!compatible ? '<div class="warning">⚠️ 这个WAV文件使用了浏览器可能不支持的编码格式</div>' : ''}
+                `;
+            } catch (error) {
+                return `<div class="error">❌ WAV格式解析失败: ${error.message}</div>`;
+            }
+        }
+
+        async function testPlayability(file) {
+            const section = document.getElementById('playabilityTest');
+            const results = document.getElementById('testResults');
+
+            try {
+                const url = URL.createObjectURL(file);
+                const audio = new Audio(url);
+                testAudio.src = url;
+
+                const result = await new Promise((resolve) => {
+                    let resolved = false;
+
+                    const onLoad = () => {
+                        if (!resolved) {
+                            resolved = true;
+                            resolve({
+                                success: true,
+                                duration: audio.duration,
+                                message: '文件可以正常播放'
+                            });
+                        }
+                    };
+
+                    const onError = () => {
+                        if (!resolved) {
+                            resolved = true;
+                            const error = audio.error;
+                            let message = '未知错误';
+
+                            if (error) {
+                                switch (error.code) {
+                                    case MediaError.MEDIA_ERR_DECODE:
+                                        message = '音频解码失败 - 文件可能损坏或使用不支持的编码';
+                                        break;
+                                    case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
+                                        message = '音频格式不受支持';
+                                        break;
+                                    case MediaError.MEDIA_ERR_NETWORK:
+                                        message = '网络错误';
+                                        break;
+                                    case MediaError.MEDIA_ERR_ABORTED:
+                                        message = '播放被中止';
+                                        break;
+                                }
+                            }
+
+                            resolve({
+                                success: false,
+                                message: message
+                            });
+                        }
+                    };
+
+                    audio.addEventListener('loadedmetadata', onLoad, { once: true });
+                    audio.addEventListener('error', onError, { once: true });
+
+                    setTimeout(() => {
+                        if (!resolved) {
+                            resolved = true;
+                            resolve({
+                                success: false,
+                                message: '加载超时'
+                            });
+                        }
+                    }, 5000);
+                });
+
+                if (result.success) {
+                    results.innerHTML = `
+                        <div class="success">
+                            ✅ ${result.message}<br>
+                            时长: ${result.duration.toFixed(2)} 秒
+                        </div>
+                    `;
+                    testAudio.style.display = 'block';
+                } else {
+                    results.innerHTML = `
+                        <div class="error">
+                            ❌ ${result.message}
+                        </div>
+                    `;
+                }
+
+            } catch (error) {
+                results.innerHTML = `
+                    <div class="error">
+                        ❌ 测试失败: ${error.message}
+                    </div>
+                `;
+            }
+
+            section.style.display = 'block';
+        }
+
+        function generateRecommendations(file) {
+            const section = document.getElementById('recommendations');
+            const solutions = document.getElementById('solutionList');
+
+            const extension = file.name.split('.').pop().toLowerCase();
+
+            let recommendations = [];
+
+            if (extension === 'wav') {
+                recommendations.push({
+                    title: '🔄 转换为标准WAV格式',
+                    content: `
+                        <p>使用以下工具将WAV文件转换为浏览器兼容的格式：</p>
+                        <ul>
+                            <li><strong>在线工具:</strong> CloudConvert, Online-Convert</li>
+                            <li><strong>桌面软件:</strong> Audacity (免费), FFmpeg</li>
+                            <li><strong>转换参数:</strong> 16位PCM, 44.1kHz或48kHz采样率</li>
+                        </ul>
+                    `
+                });
+
+                recommendations.push({
+                    title: '📱 转换为MP3格式',
+                    content: `
+                        <p>MP3格式具有最好的浏览器兼容性：</p>
+                        <ul>
+                            <li>几乎所有浏览器都支持</li>
+                            <li>文件更小，加载更快</li>
+                            <li>建议比特率：128-320 kbps</li>
+                        </ul>
+                    `
+                });
+            }
+
+            recommendations.push({
+                title: '🌐 尝试其他浏览器',
+                content: `
+                    <p>不同浏览器对音频格式的支持可能不同：</p>
+                    <ul>
+                        <li><strong>Chrome:</strong> 对大多数格式支持最好</li>
+                        <li><strong>Firefox:</strong> 对开源格式支持好</li>
+                        <li><strong>Safari:</strong> 对Apple格式支持好</li>
+                    </ul>
+                `
+            });
+
+            recommendations.push({
+                title: '🔧 使用FFmpeg转换命令',
+                content: `
+                    <p>如果您熟悉命令行，可以使用FFmpeg：</p>
+                    <code style="background: #333; padding: 10px; display: block; margin: 10px 0; border-radius: 4px;">
+                        # 转换为标准WAV<br>
+                        ffmpeg -i input.wav -acodec pcm_s16le -ar 44100 output.wav<br><br>
+                        # 转换为MP3<br>
+                        ffmpeg -i input.wav -acodec mp3 -ab 192k output.mp3
+                    </code>
+                `
+            });
+
+            const html = recommendations.map(rec => `
+                <div class="recommendation">
+                    <h3>${rec.title}</h3>
+                    ${rec.content}
+                </div>
+            `).join('');
+
+            solutions.innerHTML = html;
+            section.style.display = 'block';
+        }
+
+        function readFileBytes(file, start, length) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = () => reject(reader.error);
+                reader.readAsArrayBuffer(file.slice(start, start + length));
+            });
+        }
+
+        function formatFileSize(bytes) {
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            if (bytes === 0) return '0 Bytes';
+            const i = Math.floor(Math.log(bytes) / Math.log(1024));
+            return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+        }
+
+        function showError(message) {
+            document.body.insertAdjacentHTML('afterbegin', `
+                <div class="error" style="margin-bottom: 20px;">
+                    ${message}
+                </div>
+            `);
+        }
+    </script>
+</body>
+
+</html>

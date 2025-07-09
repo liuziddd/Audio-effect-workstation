@@ -1,0 +1,395 @@
+/* 效果器链主容器 */
+.effect-chain {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    border: 1px solid #2a2d3a;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.4),
+        0 2px 8px rgba(0, 0, 0, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    max-height: 60vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.effect-chain-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.effect-chain-header h3 {
+    margin: 0;
+    color: #00d4ff;
+    font-weight: 600;
+    font-size: 1.3em;
+    text-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
+}
+
+.chain-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.effect-count {
+    background: rgba(0, 212, 255, 0.1);
+    border: 1px solid rgba(0, 212, 255, 0.3);
+    border-radius: 8px;
+    padding: 4px 12px;
+    color: #00d4ff;
+    font-size: 0.85em;
+    font-weight: 500;
+}
+
+/* 空状态 */
+.effect-chain-empty {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    border: 1px solid #2a2d3a;
+    border-radius: 16px;
+    padding: 40px 24px;
+    text-align: center;
+}
+
+.empty-state {
+    max-width: 300px;
+    margin: 0 auto;
+}
+
+.empty-icon {
+    font-size: 3em;
+    margin-bottom: 16px;
+    opacity: 0.5;
+}
+
+.empty-state h3 {
+    color: #a0a0a0;
+    margin: 0 0 8px 0;
+    font-size: 1.2em;
+}
+
+.empty-state p {
+    color: #707070;
+    margin: 0;
+    font-size: 0.9em;
+    line-height: 1.4;
+}
+
+/* 效果器列表 */
+.effects-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* 单个效果器项目 */
+.effect-item {
+    background: linear-gradient(135deg, #2a2d3a 0%, #1e1e30 100%);
+    border: 1px solid #3a3d4a;
+    border-radius: 12px;
+    padding: 16px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.effect-item::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(0, 212, 255, 0.05) 0%, rgba(138, 43, 226, 0.05) 100%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+}
+
+.effect-item:hover::before {
+    opacity: 1;
+}
+
+.effect-item.disabled {
+    opacity: 0.5;
+}
+
+.effect-item.bypassed {
+    border-color: #ffa500;
+}
+
+.effect-item.bypassed::before {
+    background: linear-gradient(135deg, rgba(255, 165, 0, 0.1) 0%, rgba(255, 165, 0, 0.05) 100%);
+    opacity: 1;
+}
+
+.effect-item.dragging {
+    transform: rotate(2deg);
+    box-shadow:
+        0 12px 35px rgba(0, 0, 0, 0.6),
+        0 0 30px rgba(0, 212, 255, 0.3);
+    z-index: 1000;
+}
+
+/* 效果器头部 */
+.effect-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: relative;
+    z-index: 1;
+}
+
+.effect-drag-handle {
+    cursor: grab;
+    padding: 8px 4px;
+    border-radius: 6px;
+    transition: background-color 0.2s ease;
+    user-select: none;
+}
+
+.effect-drag-handle:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.effect-drag-handle:active {
+    cursor: grabbing;
+}
+
+.drag-icon {
+    color: #a0a0a0;
+    font-size: 1.2em;
+    font-weight: bold;
+    letter-spacing: -2px;
+}
+
+.effect-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+}
+
+.effect-icon {
+    font-size: 1.5em;
+}
+
+.effect-details {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.effect-name {
+    color: #ffffff;
+    font-weight: 600;
+    font-size: 1em;
+}
+
+.effect-index {
+    color: #a0a0a0;
+    font-size: 0.8em;
+    font-weight: 500;
+}
+
+/* 效果器控制按钮 */
+.effect-controls {
+    display: flex;
+    gap: 8px;
+}
+
+.control-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    padding: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 1em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 36px;
+    height: 36px;
+}
+
+.control-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
+}
+
+.control-btn.active {
+    background: rgba(0, 212, 255, 0.2);
+    border-color: #00d4ff;
+    box-shadow: 0 0 12px rgba(0, 212, 255, 0.3);
+}
+
+.bypass-btn.active {
+    background: rgba(255, 165, 0, 0.2);
+    border-color: #ffa500;
+    box-shadow: 0 0 12px rgba(255, 165, 0, 0.3);
+}
+
+.remove-btn:hover {
+    background: rgba(255, 69, 58, 0.2);
+    border-color: #ff4539;
+}
+
+/* 效果器参数控制 */
+.effect-parameters {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    position: relative;
+    z-index: 1;
+}
+
+.parameter-control {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.parameter-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #ffffff;
+    font-size: 0.9em;
+    font-weight: 500;
+    text-transform: capitalize;
+}
+
+.parameter-value {
+    color: #00d4ff;
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+    background: rgba(0, 212, 255, 0.1);
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+
+.parameter-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 6px;
+    background: linear-gradient(to right, #3a3d4a 0%, #2a2d3a 100%);
+    border-radius: 3px;
+    outline: none;
+    transition: all 0.2s ease;
+}
+
+.parameter-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    background: linear-gradient(135deg, #00d4ff 0%, #8a2be2 100%);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    transition: all 0.2s ease;
+}
+
+.parameter-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 15px rgba(0, 212, 255, 0.4);
+}
+
+.parameter-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    background: linear-gradient(135deg, #00d4ff 0%, #8a2be2 100%);
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    transition: all 0.2s ease;
+}
+
+.parameter-slider::-moz-range-thumb:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 15px rgba(0, 212, 255, 0.4);
+}
+
+/* 自定义滚动条样式 */
+.effect-chain::-webkit-scrollbar {
+    width: 8px;
+}
+
+.effect-chain::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+}
+
+.effect-chain::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #00d4ff 0%, #8a2be2 100%);
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.effect-chain::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, #00b8e6 0%, #7a25d1 100%);
+    box-shadow: 0 0 8px rgba(0, 212, 255, 0.3);
+}
+
+/* Firefox 滚动条样式 */
+.effect-chain {
+    scrollbar-width: thin;
+    scrollbar-color: #00d4ff rgba(255, 255, 255, 0.05);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .effect-chain {
+        padding: 16px;
+        max-height: 40vh;
+    }
+    
+    .effect-header {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    
+    .effect-controls {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+    
+    .control-btn {
+        min-width: 32px;
+        height: 32px;
+        font-size: 0.9em;
+    }
+    
+    .effect-parameters {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    
+    .parameter-label {
+        font-size: 0.85em;
+    }
+}
+
+/* 动画效果 */
+@keyframes effectAdded {
+    from {
+        opacity: 0;
+        transform: translateY(-20px) scale(0.9);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.effect-item {
+    animation: effectAdded 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}

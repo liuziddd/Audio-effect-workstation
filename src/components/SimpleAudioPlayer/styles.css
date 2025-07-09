@@ -1,0 +1,429 @@
+.simple-audio-player {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    border: 1px solid #2a2d3a;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.4),
+        0 2px 8px rgba(0, 0, 0, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.no-audio-message {
+    text-align: center;
+    padding: 40px 20px;
+}
+
+.no-audio-message .icon {
+    font-size: 3rem;
+    margin-bottom: 16px;
+    opacity: 0.7;
+}
+
+.no-audio-message h3 {
+    color: #a0a0a0;
+    margin: 0 0 8px 0;
+    font-size: 1.2rem;
+}
+
+.no-audio-message p {
+    color: #707070;
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+.audio-info {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.file-icon {
+    font-size: 2.5rem;
+    filter: drop-shadow(0 0 8px rgba(0, 212, 255, 0.3));
+}
+
+.file-details {
+    flex: 1;
+}
+
+.file-name {
+    color: #ffffff;
+    margin: 0 0 4px 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    word-break: break-all;
+}
+
+.file-meta {
+    color: #a0a0a0;
+    margin: 0;
+    font-size: 0.85rem;
+}
+
+/* 自定义播放器样式 */
+.custom-player {
+    background: linear-gradient(135deg, #2a2d3a 0%, #1e1e30 100%);
+    border: 1px solid #3a3d4a;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.player-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.control-btn {
+    background: linear-gradient(135deg, #00d4ff 0%, #8a2be2 100%);
+    border: none;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    font-size: 1.2em;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.control-btn:hover:not(:disabled) {
+    transform: scale(1.05);
+    box-shadow: 0 0 20px rgba(0, 212, 255, 0.4);
+}
+
+.control-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.control-btn.play-btn {
+    width: 60px;
+    height: 60px;
+    font-size: 1.4em;
+}
+
+.control-btn.loop-btn {
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.control-btn.loop-btn.active {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
+    animation: loop-pulse 2s infinite;
+}
+
+.control-btn.loop-btn.active:hover:not(:disabled) {
+    box-shadow: 0 0 25px rgba(16, 185, 129, 0.7);
+}
+
+@keyframes loop-pulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
+    }
+
+    50% {
+        box-shadow: 0 0 30px rgba(16, 185, 129, 0.8);
+    }
+}
+
+.progress-section {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.time-display {
+    color: #a0a0a0;
+    font-size: 0.85rem;
+    font-family: 'Courier New', monospace;
+    min-width: 45px;
+    text-align: center;
+}
+
+.progress-bar-container {
+    flex: 1;
+}
+
+.progress-bar {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 8px;
+    background: linear-gradient(to right, #3a3d4a 0%, #2a2d3a 100%);
+    border-radius: 4px;
+    outline: none;
+    cursor: pointer;
+}
+
+.progress-bar::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    background: #ffffff;
+    border-radius: 50%;
+    border: 2px solid #00d4ff;
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(0, 212, 255, 0.4);
+    transition: all 0.2s ease;
+}
+
+.progress-bar::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 15px rgba(0, 212, 255, 0.6);
+}
+
+.progress-bar::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    background: #ffffff;
+    border-radius: 50%;
+    border: 2px solid #00d4ff;
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(0, 212, 255, 0.4);
+    transition: all 0.2s ease;
+}
+
+.volume-section {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    justify-content: center;
+    margin-bottom: 16px;
+}
+
+.volume-icon {
+    font-size: 1.1em;
+    color: #a0a0a0;
+}
+
+.volume-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100px;
+    height: 4px;
+    background: linear-gradient(to right, #3a3d4a 0%, #2a2d3a 100%);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+}
+
+.volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    background: #ffffff;
+    border-radius: 50%;
+    border: 2px solid #00d4ff;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.volume-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 10px rgba(0, 212, 255, 0.4);
+}
+
+.volume-slider::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    background: #ffffff;
+    border-radius: 50%;
+    border: 2px solid #00d4ff;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.volume-display {
+    color: #a0a0a0;
+    font-size: 0.8rem;
+    font-family: 'Courier New', monospace;
+    min-width: 35px;
+}
+
+/* 状态和操作区域 */
+.status-section {
+    margin-top: 16px;
+}
+
+.status-indicators {
+    text-align: center;
+    margin-bottom: 12px;
+}
+
+.status {
+    color: #a0a0a0;
+    font-size: 0.8rem;
+    padding: 4px 12px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    display: inline-block;
+}
+
+.status.loading {
+    color: #ffa500;
+    border-color: rgba(255, 165, 0, 0.3);
+    background: rgba(255, 165, 0, 0.1);
+}
+
+.status.ready {
+    color: #00ff00;
+    border-color: rgba(0, 255, 0, 0.3);
+    background: rgba(0, 255, 0, 0.1);
+}
+
+.status.playing {
+    color: #00d4ff;
+    border-color: rgba(0, 212, 255, 0.3);
+    background: rgba(0, 212, 255, 0.1);
+}
+
+/* 文件操作按钮 */
+.file-actions {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.action-btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(10px);
+}
+
+.action-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.clear-btn {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: white;
+}
+
+.clear-btn:hover {
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+}
+
+.select-btn {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: white;
+}
+
+.select-btn:hover {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+}
+
+/* 基础播放器样式 */
+.basic-player {
+    margin-bottom: 16px;
+}
+
+.basic-audio-element {
+    width: 100%;
+    border-radius: 8px;
+    background: #2a2d3a;
+}
+
+.play-hint {
+    text-align: center;
+    margin-top: 16px;
+}
+
+.play-hint p {
+    color: #707070;
+    font-size: 0.8rem;
+    margin: 0;
+    line-height: 1.4;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .simple-audio-player {
+        padding: 16px;
+    }
+
+    .audio-info {
+        flex-direction: column;
+        text-align: center;
+        gap: 12px;
+    }
+
+    .file-icon {
+        font-size: 2rem;
+    }
+
+    .progress-section {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .time-display {
+        min-width: auto;
+    }
+
+    .volume-section {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .volume-slider {
+        width: 80px;
+    }
+
+    .player-controls {
+        gap: 12px;
+    }
+
+    .control-btn {
+        width: 45px;
+        height: 45px;
+        font-size: 1.1em;
+    }
+
+    .control-btn.play-btn {
+        width: 55px;
+        height: 55px;
+        font-size: 1.3em;
+    }
+
+    .control-btn.loop-btn {
+        font-size: 1em;
+    }
+
+    /* 移动端文件操作按钮 */
+    .file-actions {
+        gap: 8px;
+    }
+
+    .action-btn {
+        padding: 6px 12px;
+        font-size: 12px;
+    }
+}

@@ -1,0 +1,345 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 全局样式重置 */
+@layer base {
+    * {
+        box-sizing: border-box;
+    }
+
+    /* Firefox 滚动条样式 - 仅在支持的浏览器中应用 */
+    @supports (scrollbar-width: thin) {
+        * {
+            scrollbar-width: thin;
+            scrollbar-color: #00d4ff rgba(255, 255, 255, 0.05);
+        }
+    }
+
+    html,
+    body {
+        margin: 0;
+        padding: 0;
+        min-height: 100vh;
+        overflow-x: hidden;
+        scroll-behavior: smooth;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+        background: #0a0a0a;
+        color: #ffffff;
+        /* 文本大小调整 - 添加浏览器兼容性 */
+        -webkit-text-size-adjust: 100%;
+        -moz-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+        /* 阻止触摸操作的默认行为 */
+        -ms-touch-action: manipulation;
+        touch-action: manipulation;
+    }
+
+    #root {
+        min-height: 100vh;
+        width: 100vw;
+        overflow-x: hidden;
+    }
+}
+
+/* 自定义组件样式 */
+@layer components {
+
+    /* 霓虹按钮效果 */
+    .neon-button {
+        @apply relative px-6 py-3 bg-transparent border-2 rounded-lg font-semibold transition-all duration-300 ease-out;
+        @apply hover:shadow-neon active:scale-95;
+    }
+
+    .neon-button-blue {
+        @apply border-neon-blue text-neon-blue hover:bg-neon-blue hover:text-black;
+    }
+
+    .neon-button-purple {
+        @apply border-neon-purple text-neon-purple hover:bg-neon-purple hover:text-black;
+    }
+
+    .neon-button-green {
+        @apply border-neon-green text-neon-green hover:bg-neon-green hover:text-black;
+    }
+
+    .neon-button-orange {
+        @apply border-neon-orange text-neon-orange hover:bg-neon-orange hover:text-black;
+    }
+
+    /* 混音台风格面板 */
+    .mixer-panel {
+        @apply bg-gradient-to-b from-dark-surface to-dark-bg border border-dark-border rounded-xl;
+        @apply shadow-lg backdrop-blur-sm;
+    }
+
+    /* 旋钮样式 */
+    .knob-container {
+        @apply relative w-16 h-16 mx-auto;
+    }
+
+    .knob {
+        @apply w-full h-full rounded-full bg-gradient-to-br from-gray-700 to-gray-900;
+        @apply border-2 border-gray-600 cursor-pointer transition-all duration-200;
+        @apply hover:border-neon-blue hover:shadow-neon;
+    }
+
+    .knob::before {
+        content: '';
+        @apply absolute w-1 h-6 bg-neon-blue rounded-full left-1/2 top-1;
+        transform: translateX(-50%);
+    }
+
+    /* 滑块样式 */
+    .fader {
+        @apply w-8 h-64 bg-gradient-to-t from-dark-bg to-dark-surface;
+        @apply border border-dark-border rounded-lg relative cursor-pointer;
+    }
+
+    .fader-handle {
+        @apply absolute w-6 h-4 bg-gradient-to-r from-neon-blue to-neon-purple;
+        @apply rounded-sm left-1/2 transform -translate-x-1/2 transition-all duration-200;
+        @apply hover:shadow-neon cursor-grab active:cursor-grabbing;
+    }
+
+    /* LED指示灯 */
+    .led {
+        @apply w-3 h-3 rounded-full transition-all duration-300;
+    }
+
+    .led-red {
+        @apply bg-red-500 shadow-[0_0_10px_#ef4444];
+    }
+
+    .led-green {
+        @apply bg-neon-green shadow-[0_0_10px_#39ff73];
+    }
+
+    .led-blue {
+        @apply bg-neon-blue shadow-[0_0_10px_#00d4ff];
+    }
+
+    .led-off {
+        @apply bg-gray-700 shadow-none;
+    }
+
+    /* 频谱分析器 */
+    .spectrum-bar {
+        @apply bg-gradient-to-t from-neon-green via-neon-orange to-red-500;
+        @apply transition-all duration-100 ease-out;
+    }
+
+    /* VU表 */
+    .vu-meter {
+        @apply bg-black border border-dark-border rounded;
+    }
+
+    .vu-bar {
+        @apply h-2 transition-all duration-100;
+    }
+
+    .vu-bar-green {
+        @apply bg-neon-green;
+    }
+
+    .vu-bar-yellow {
+        @apply bg-neon-orange;
+    }
+
+    .vu-bar-red {
+        @apply bg-red-500;
+    }
+
+    /* 效果器机架 */
+    .effect-rack {
+        @apply bg-gray-900 border border-gray-700 rounded-lg p-4;
+        @apply shadow-inner;
+    }
+
+    .effect-unit {
+        @apply mixer-panel p-4 mb-4 relative;
+        @apply hover:border-neon-blue transition-all duration-300;
+    }
+
+    /* 波形显示 */
+    .waveform-container {
+        @apply bg-black border border-dark-border rounded-lg p-2;
+        @apply relative overflow-hidden;
+    }
+
+    /* 工具提示 */
+    .tooltip {
+        @apply absolute z-50 px-2 py-1 text-xs bg-gray-900 text-white rounded;
+        @apply border border-gray-700 shadow-lg opacity-0 transition-opacity duration-200;
+        @apply pointer-events-none;
+    }
+
+    /* 全局滚动条样式 */
+    ::-webkit-scrollbar {
+        width: 12px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 6px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: linear-gradient(135deg, #00d4ff 0%, #b84cff 100%);
+        border-radius: 6px;
+        border: 2px solid transparent;
+        -webkit-background-clip: content-box;
+        background-clip: content-box;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(135deg, #00b8e6 0%, #a23de8 100%);
+        box-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
+    }
+
+    /* 组件专用滚动条样式 */
+    .custom-scrollbar::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-track {
+        @apply bg-dark-bg rounded;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        @apply bg-gray-600 rounded hover:bg-gray-500;
+    }
+
+    /* 文件拖放区域 */
+    .drop-zone {
+        @apply border-2 border-dashed border-gray-600 rounded-xl p-8;
+        @apply bg-dark-surface hover:border-neon-blue transition-all duration-300;
+        @apply hover:bg-opacity-50;
+    }
+
+    .drop-zone.drag-over {
+        @apply border-neon-blue bg-neon-blue bg-opacity-10;
+    }
+}
+
+/* 自定义动画 */
+@layer utilities {
+    .animate-pulse-neon {
+        animation: pulse-neon 2s ease-in-out infinite;
+    }
+
+    .animate-glow {
+        animation: glow 2s ease-in-out infinite alternate;
+    }
+
+    .animate-spectrum {
+        animation: spectrum 0.1s ease-out;
+    }
+
+    @keyframes pulse-neon {
+
+        0%,
+        100% {
+            box-shadow: 0 0 5px currentColor;
+        }
+
+        50% {
+            box-shadow: 0 0 20px currentColor, 0 0 30px currentColor;
+        }
+    }
+
+    @keyframes glow {
+        0% {
+            box-shadow: 0 0 5px currentColor;
+        }
+
+        100% {
+            box-shadow: 0 0 20px currentColor, 0 0 30px currentColor, 0 0 40px currentColor;
+        }
+    }
+
+    @keyframes spectrum {
+        0% {
+            transform: scaleY(0);
+        }
+
+        100% {
+            transform: scaleY(1);
+        }
+    }
+
+    /* 响应式隐藏 */
+    .hide-mobile {
+        @apply hidden lg:block;
+    }
+
+    .show-mobile {
+        @apply block lg:hidden;
+    }
+
+    /* Glassmorphism效果 */
+    .glass {
+        @apply bg-white bg-opacity-5 backdrop-blur-md border border-white border-opacity-20;
+    }
+
+    .glass-dark {
+        @apply bg-black bg-opacity-20 backdrop-blur-md border border-white border-opacity-10;
+    }
+}
+
+/* 特殊选择器 */
+input[type="range"] {
+    @apply appearance-none bg-transparent cursor-pointer;
+}
+
+input[type="range"]::-webkit-slider-track {
+    @apply h-1 bg-gray-600 rounded-full;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+    @apply appearance-none w-4 h-4 rounded-full cursor-pointer border-2 border-white;
+    background: linear-gradient(45deg, #00d4ff, #b84cff);
+    box-shadow: 0 2px 8px rgba(0, 212, 255, 0.3);
+    transition: all 0.2s ease;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+    box-shadow: 0 4px 16px rgba(0, 212, 255, 0.5);
+}
+
+input[type="range"]:disabled::-webkit-slider-thumb {
+    background: #666;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+input[type="range"]::-moz-range-track {
+    @apply h-1 bg-gray-600 rounded-full border-none;
+}
+
+input[type="range"]::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: linear-gradient(45deg, #00d4ff, #b84cff);
+    cursor: pointer;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 8px rgba(0, 212, 255, 0.3);
+    transition: all 0.2s ease;
+}
+
+input[type="range"]:disabled::-moz-range-thumb {
+    background: #666;
+    cursor: not-allowed;
+}
+
+/* 防止文本选择 */
+.no-select {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}

@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>音频兼容性测试 - 音频效果工作站</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: white;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        h1 {
+            background: linear-gradient(135deg, #00d4ff, #8a2be2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .test-section {
+            background: rgba(255, 255, 255, 0.03);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .test-section h2 {
+            color: #00d4ff;
+            margin-top: 0;
+        }
+
+        .result {
+            padding: 10px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-weight: 500;
+        }
+
+        .success {
+            background: rgba(16, 185, 129, 0.2);
+            border: 1px solid #10b981;
+            color: #34d399;
+        }
+
+        .warning {
+            background: rgba(245, 158, 11, 0.2);
+            border: 1px solid #f59e0b;
+            color: #fbbf24;
+        }
+
+        .error {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid #ef4444;
+            color: #f87171;
+        }
+
+        .info {
+            background: rgba(59, 130, 246, 0.2);
+            border: 1px solid #3b82f6;
+            color: #60a5fa;
+        }
+
+        input[type="file"] {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            padding: 10px;
+            color: white;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+
+        button {
+            background: linear-gradient(135deg, #00d4ff, #8a2be2);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            font-weight: 500;
+            transition: transform 0.2s;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .back-link {
+            display: inline-block;
+            color: #00d4ff;
+            text-decoration: none;
+            margin-bottom: 20px;
+            padding: 8px 16px;
+            border: 1px solid #00d4ff;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .back-link:hover {
+            background: rgba(0, 212, 255, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .audio-player {
+            margin: 15px 0;
+        }
+
+        audio {
+            width: 100%;
+            margin: 10px 0;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .format-support {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        .format-item {
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.9em;
+        }
+
+        .tabs {
+            display: flex;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 12px 20px;
+            background: transparent;
+            border: none;
+            color: #a0a0a0;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .tab.active {
+            background: linear-gradient(135deg, #00d4ff, #8a2be2);
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <a href="/" class="back-link">← 返回主应用</a>
+
+        <h1>🎵 音频兼容性测试</h1>
+
+        <div class="test-section">
+            <h2>📁 选择音频文件</h2>
+            <input type="file" id="audioFile" accept="audio/*">
+            <div id="fileInfo"></div>
+        </div>
+
+        <!-- 选项卡 -->
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('compatibility')">兼容性检查</button>
+            <button class="tab" onclick="switchTab('playback')">播放测试</button>
+            <button class="tab" onclick="switchTab('tone')">Tone.js测试</button>
+        </div>
+
+        <!-- 兼容性检查 -->
+        <div id="compatibility-tab" class="tab-content active">
+            <div class="test-section">
+                <h2>🌐 浏览器支持检查</h2>
+                <div id="browserSupport"></div>
+
+                <h3>📊 音频格式支持</h3>
+                <div id="formatSupport" class="format-support"></div>
+            </div>
+
+            <div class="test-section">
+                <h2>🧪 文件兼容性测试</h2>
+                <button id="testCompatibilityBtn" disabled>开始兼容性测试</button>
+                <div id="compatibilityResults"></div>
+            </div>
+        </div>
+
+        <!-- 播放测试 -->
+        <div id="playback-tab" class="tab-content">
+            <div class="test-section">
+                <h2>🎵 HTML5 Audio播放测试</h2>
+                <button id="loadAudioBtn" disabled>加载音频</button>
+                <div id="audioStatus"></div>
+                <div class="audio-player">
+                    <audio id="testAudio" controls style="display: none;"></audio>
+                </div>
+                <div style="margin-top: 10px;">
+                    <button id="playBtn" disabled>播放</button>
+                    <button id="pauseBtn" disabled>暂停</button>
+                    <button id="stopBtn" disabled>停止</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tone.js测试 -->
+        <div id="tone-tab" class="tab-content">
+            <div class="test-section">
+                <h2>🎛️ Tone.js引擎测试</h2>
+                <button id="testToneBtn">测试Tone.js基本功能</button>
+                <button id="loadToneAudioBtn" disabled>用Tone.js加载音频</button>
+                <div id="toneStatus"></div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>💡 使用建议</h2>
+            <div id="recommendations">
+                <div class="info">
+                    <h4>测试说明:</h4>
+                    <ul>
+                        <li>上传音频文件后，在各个选项卡中进行不同类型的测试</li>
+                        <li>兼容性检查：验证浏览器对文件格式的支持</li>
+                        <li>播放测试：使用HTML5 Audio元素测试播放功能</li>
+                        <li>Tone.js测试：验证音频工作站使用的音频引擎</li>
+                        <li>如果所有测试都通过，说明文件与系统完全兼容</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/tone@latest/build/Tone.js"></script>
+    <script>
+        const audioFile = document.getElementById('audioFile');
+        let currentFile = null;
+        let currentAudio = null;
+        let tonePlayer = null;
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            checkBrowserSupport();
+            checkAudioFormats();
+        });
+
+        // 文件选择事件
+        audioFile.addEventListener('change', (e) => {
+            currentFile = e.target.files[0];
+
+            // 启用测试按钮
+            document.getElementById('testCompatibilityBtn').disabled = !currentFile;
+            document.getElementById('loadAudioBtn').disabled = !currentFile;
+            document.getElementById('loadToneAudioBtn').disabled = !currentFile;
+
+            if (currentFile) {
+                showFileInfo(currentFile);
+            }
+        });
+
+        // 显示文件信息
+        function showFileInfo(file) {
+            const fileInfo = document.getElementById('fileInfo');
+            const extension = file.name.split('.').pop().toLowerCase();
+            const isMP3 = extension === 'mp3' || file.type.includes('mp3') || file.type.includes('mpeg');
+
+            fileInfo.innerHTML = `
+                <div class="success">
+                    <h4>文件信息:</h4>
+                    <p><strong>文件名:</strong> ${file.name}</p>
+                    <p><strong>格式:</strong> ${extension.toUpperCase()} ${isMP3 ? '(推荐格式)' : ''}</p>
+                    <p><strong>MIME类型:</strong> ${file.type || '未知'}</p>
+                    <p><strong>文件大小:</strong> ${(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                    <p><strong>最后修改:</strong> ${new Date(file.lastModified).toLocaleString()}</p>
+                </div>
+            `;
+        }
+
+        // 选项卡切换
+        function switchTab(tabName) {
+            // 隐藏所有内容
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // 显示选中的内容
+            document.getElementById(tabName + '-tab').classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // 检查浏览器支持
+        function checkBrowserSupport() {
+            const support = {
+                audioContext: !!(window.AudioContext || window.webkitAudioContext),
+                mediaDevices: !!navigator.mediaDevices,
+                getUserMedia: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia),
+                webAudio: typeof window.AudioContext !== 'undefined' || typeof window.webkitAudioContext !== 'undefined'
+            };
+
+            let html = '';
+            for (const [feature, supported] of Object.entries(support)) {
+                const status = supported ? '✅ 支持' : '❌ 不支持';
+                const className = supported ? 'success' : 'error';
+                const featureName = {
+                    audioContext: 'AudioContext',
+                    mediaDevices: 'MediaDevices',
+                    getUserMedia: 'getUserMedia',
+                    webAudio: 'Web Audio API'
+                }[feature];
+
+                html += `<div class="result ${className}">${status} ${featureName}</div>`;
+            }
+
+            document.getElementById('browserSupport').innerHTML = html;
+        }
+
+        // 检查音频格式支持
+        function checkAudioFormats() {
+            const audio = new Audio();
+            const formats = [
+                { name: 'MP3', mime: 'audio/mpeg' },
+                { name: 'WAV', mime: 'audio/wav' },
+                { name: 'OGG', mime: 'audio/ogg' },
+                { name: 'AAC', mime: 'audio/aac' },
+                { name: 'M4A', mime: 'audio/mp4' },
+                { name: 'WebM', mime: 'audio/webm' },
+                { name: 'FLAC', mime: 'audio/flac' }
+            ];
+
+            let html = '';
+            formats.forEach(format => {
+                const support = audio.canPlayType(format.mime);
+                let className = 'error';
+                let status = '❌ 不支持';
+
+                if (support === 'probably') {
+                    className = 'success';
+                    status = '✅ 完全支持';
+                } else if (support === 'maybe') {
+                    className = 'warning';
+                    status = '⚠️ 可能支持';
+                }
+
+                html += `<div class="format-item result ${className}">${format.name}: ${status}</div>`;
+            });
+
+            document.getElementById('formatSupport').innerHTML = html;
+        }
+
+        // 兼容性测试
+        document.getElementById('testCompatibilityBtn').addEventListener('click', async () => {
+            if (!currentFile) return;
+
+            const btn = document.getElementById('testCompatibilityBtn');
+            btn.disabled = true;
+            btn.textContent = '测试中...';
+
+            try {
+                const result = await testFileCompatibility(currentFile);
+                displayCompatibilityResults(result);
+            } catch (error) {
+                document.getElementById('compatibilityResults').innerHTML = `
+                    <div class="error">❌ 测试失败: ${error.message}</div>
+                `;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '开始兼容性测试';
+            }
+        });
+
+        // 文件兼容性测试
+        async function testFileCompatibility(file) {
+            return new Promise((resolve) => {
+                const url = URL.createObjectURL(file);
+                const audio = new Audio();
+
+                const timeout = setTimeout(() => {
+                    URL.revokeObjectURL(url);
+                    resolve({
+                        success: false,
+                        message: '测试超时',
+                        duration: null
+                    });
+                }, 10000);
+
+                audio.addEventListener('loadedmetadata', () => {
+                    clearTimeout(timeout);
+                    URL.revokeObjectURL(url);
+                    resolve({
+                        success: true,
+                        message: '文件兼容性良好',
+                        duration: audio.duration
+                    });
+                }, { once: true });
+
+                audio.addEventListener('error', () => {
+                    clearTimeout(timeout);
+                    URL.revokeObjectURL(url);
+                    const error = audio.error;
+                    let message = '未知错误';
+
+                    if (error) {
+                        switch (error.code) {
+                            case MediaError.MEDIA_ERR_DECODE:
+                                message = '音频解码失败，文件可能损坏';
+                                break;
+                            case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
+                                message = '音频格式不受浏览器支持';
+                                break;
+                            case MediaError.MEDIA_ERR_NETWORK:
+                                message = '网络错误';
+                                break;
+                            default:
+                                message = `媒体错误 (代码: ${error.code})`;
+                        }
+                    }
+
+                    resolve({
+                        success: false,
+                        message: message,
+                        duration: null
+                    });
+                }, { once: true });
+
+                audio.src = url;
+                audio.preload = 'metadata';
+            });
+        }
+
+        // 显示兼容性测试结果
+        function displayCompatibilityResults(result) {
+            const className = result.success ? 'success' : 'error';
+            const icon = result.success ? '✅' : '❌';
+
+            let html = `
+                <div class="result ${className}">
+                    <h4>${icon} ${result.message}</h4>
+            `;
+
+            if (result.success && result.duration) {
+                const mins = Math.floor(result.duration / 60);
+                const secs = Math.floor(result.duration % 60);
+                html += `<p><strong>时长:</strong> ${mins}:${secs.toString().padStart(2, '0')} (${result.duration.toFixed(2)}秒)</p>`;
+            }
+
+            html += '</div>';
+
+            if (!result.success) {
+                html += generateSuggestions(result.message);
+            }
+
+            document.getElementById('compatibilityResults').innerHTML = html;
+        }
+
+        // 生成建议
+        function generateSuggestions(errorMessage) {
+            let suggestions = [];
+
+            if (errorMessage.includes('格式不受支持')) {
+                suggestions.push('尝试转换为MP3或WAV格式');
+                suggestions.push('使用更现代的浏览器');
+            }
+
+            if (errorMessage.includes('解码失败')) {
+                suggestions.push('检查文件是否损坏');
+                suggestions.push('尝试重新编码文件');
+            }
+
+            if (suggestions.length > 0) {
+                return `
+                    <div class="result warning">
+                        <h4>💡 建议解决方案:</h4>
+                        <ul>
+                            ${suggestions.map(s => `<li>${s}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
+
+            return '';
+        }
+
+        // HTML5 Audio播放测试
+        document.getElementById('loadAudioBtn').addEventListener('click', async () => {
+            if (!currentFile) return;
+
+            const status = document.getElementById('audioStatus');
+            const testAudio = document.getElementById('testAudio');
+
+            status.innerHTML = '<div class="info">⏳ 加载音频文件中...</div>';
+
+            try {
+                const url = URL.createObjectURL(currentFile);
+
+                await new Promise((resolve, reject) => {
+                    const audio = new Audio();
+
+                    audio.addEventListener('loadedmetadata', () => {
+                        status.innerHTML = `
+                            <div class="success">
+                                ✅ 音频加载成功！<br>
+                                时长: ${audio.duration.toFixed(2)}秒
+                            </div>
+                        `;
+
+                        // 清理之前的音频
+                        if (currentAudio) {
+                            currentAudio.pause();
+                            URL.revokeObjectURL(currentAudio.src);
+                        }
+
+                        currentAudio = audio;
+                        testAudio.src = url;
+                        testAudio.style.display = 'block';
+
+                        // 启用控制按钮
+                        document.getElementById('playBtn').disabled = false;
+                        document.getElementById('pauseBtn').disabled = false;
+                        document.getElementById('stopBtn').disabled = false;
+
+                        resolve();
+                    }, { once: true });
+
+                    audio.addEventListener('error', (e) => {
+                        status.innerHTML = `<div class="error">❌ 加载失败: ${e.message || '未知错误'}</div>`;
+                        reject(e);
+                    }, { once: true });
+
+                    audio.src = url;
+                    audio.preload = 'metadata';
+                });
+
+            } catch (error) {
+                status.innerHTML = `<div class="error">❌ 加载失败: ${error.message}</div>`;
+            }
+        });
+
+        // 播放控制事件
+        document.getElementById('playBtn').addEventListener('click', () => {
+            if (currentAudio) {
+                currentAudio.play().then(() => {
+                    document.getElementById('audioStatus').innerHTML =
+                        '<div class="success">▶️ 正在播放...</div>';
+                }).catch(error => {
+                    document.getElementById('audioStatus').innerHTML =
+                        `<div class="error">❌ 播放失败: ${error.message}</div>`;
+                });
+            }
+        });
+
+        document.getElementById('pauseBtn').addEventListener('click', () => {
+            if (currentAudio) {
+                currentAudio.pause();
+                document.getElementById('audioStatus').innerHTML =
+                    '<div class="warning">⏸️ 已暂停</div>';
+            }
+        });
+
+        document.getElementById('stopBtn').addEventListener('click', () => {
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio.currentTime = 0;
+                document.getElementById('audioStatus').innerHTML =
+                    '<div class="info">⏹️ 已停止</div>';
+            }
+        });
+
+        // Tone.js测试
+        document.getElementById('testToneBtn').addEventListener('click', async () => {
+            const status = document.getElementById('toneStatus');
+
+            try {
+                status.innerHTML = '<div class="info">⏳ 测试Tone.js基本功能...</div>';
+
+                // 启动Tone.js
+                await Tone.start();
+
+                // 创建一个简单的音调测试
+                const synth = new Tone.Synth().toDestination();
+                synth.triggerAttackRelease("C4", "8n");
+
+                status.innerHTML = '<div class="success">✅ Tone.js功能正常！已播放测试音调</div>';
+
+                // 清理
+                setTimeout(() => {
+                    synth.dispose();
+                }, 1000);
+
+            } catch (error) {
+                status.innerHTML = `<div class="error">❌ Tone.js测试失败: ${error.message}</div>`;
+            }
+        });
+
+        // Tone.js音频加载测试
+        document.getElementById('loadToneAudioBtn').addEventListener('click', async () => {
+            if (!currentFile) return;
+
+            const status = document.getElementById('toneStatus');
+
+            try {
+                status.innerHTML = '<div class="info">⏳ 使用Tone.js加载音频...</div>';
+
+                await Tone.start();
+
+                // 清理之前的播放器
+                if (tonePlayer) {
+                    tonePlayer.dispose();
+                }
+
+                const url = URL.createObjectURL(currentFile);
+
+                // 创建Tone.js播放器
+                tonePlayer = new Tone.Player({
+                    url: url,
+                    onload: () => {
+                        status.innerHTML = `
+                            <div class="success">
+                                ✅ Tone.js加载成功！<br>
+                                时长: ${tonePlayer.buffer.duration.toFixed(2)}秒<br>
+                                <button onclick="playToneAudio()">使用Tone.js播放</button>
+                                <button onclick="stopToneAudio()">停止</button>
+                            </div>
+                        `;
+                    },
+                    onerror: (error) => {
+                        status.innerHTML = `<div class="error">❌ Tone.js加载失败: ${error}</div>`;
+                    }
+                }).toDestination();
+
+            } catch (error) {
+                status.innerHTML = `<div class="error">❌ Tone.js加载失败: ${error.message}</div>`;
+            }
+        });
+
+        // Tone.js播放控制
+        function playToneAudio() {
+            if (tonePlayer && tonePlayer.loaded) {
+                tonePlayer.start();
+                document.getElementById('toneStatus').innerHTML =
+                    document.getElementById('toneStatus').innerHTML.replace('使用Tone.js播放', '正在播放...');
+            }
+        }
+
+        function stopToneAudio() {
+            if (tonePlayer) {
+                tonePlayer.stop();
+                document.getElementById('toneStatus').innerHTML =
+                    document.getElementById('toneStatus').innerHTML.replace('正在播放...', '已停止');
+            }
+        }
+
+        // 页面卸载时清理资源
+        window.addEventListener('beforeunload', () => {
+            if (currentAudio) {
+                currentAudio.pause();
+                URL.revokeObjectURL(currentAudio.src);
+            }
+            if (tonePlayer) {
+                tonePlayer.dispose();
+            }
+        });
+    </script>
+</body>
+
+</html>
