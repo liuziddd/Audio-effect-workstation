@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as Tone from 'tone';
 import { useAudioWithEffects } from './hooks/useAudioWithEffects';
@@ -9,12 +9,16 @@ import { SimpleAudioPlayer } from './components/SimpleAudioPlayer';
 import { AudioExport } from './components/AudioExport';
 import { AudioFile } from './types/audio';
 
+// AI 分轨：懒加载，模型与推理引擎仅在首次使用时拉取
+const StemSeparator = lazy(() => import('./components/StemSeparator'));
+
 function App() {
     const [audioFile, setAudioFile] = useState<AudioFile | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [hasAudioBuffer, setHasAudioBuffer] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+    const [showStemSeparator, setShowStemSeparator] = useState(false);
 
     const {
         isPlaying,
@@ -26,6 +30,8 @@ function App() {
         play,
         pause,
         stop,
+        beginSeek,
+        previewSeek,
         seek,
         setVolume,
         loadAudio,
@@ -49,6 +55,8 @@ function App() {
         play,
         pause,
         stop,
+        beginSeek,
+        previewSeek,
         seek,
         setVolume,
         exportAudio,
@@ -257,35 +265,54 @@ function App() {
 
                         {/* 工具按钮区域 */}
                         <motion.div
-                            className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 mb-6 px-4"
+                            className="flex justify-center gap-4 mb-6 px-4"
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.6, delay: 0.3 }}
                         >
                             <motion.a
-                                href="/audio-analyzer.html"
+                                href="/audio-inspector.html"
                                 target="_blank"
-                                className="group relative inline-flex items-center justify-center gap-2 px-4 sm:px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white font-medium rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 text-sm sm:text-base"
+                                className="group relative inline-flex items-center justify-center gap-2 px-4 sm:px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-medium rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 text-sm sm:text-base"
                                 whileHover={{ scale: 1.05 }}
                                 whileTap={{ scale: 0.95 }}
                             >
                                 <span className="text-lg">🔍</span>
-                                <span className="whitespace-nowrap">音频文件分析工具</span>
-                                <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-blue-500 rounded-xl opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
+                                <span className="whitespace-nowrap">音频检测工具</span>
                             </motion.a>
-
-                            <motion.a
-                                href="/audio-test.html"
-                                target="_blank"
-                                className="group relative inline-flex items-center justify-center gap-2 px-4 sm:px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white font-medium rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 text-sm sm:text-base"
+                            <motion.button
+                                onClick={() => setShowStemSeparator(value => !value)}
+                                className={`inline-flex items-center justify-center gap-2 px-4 sm:px-6 py-3 font-medium rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 text-sm sm:text-base ${
+                                    showStemSeparator
+                                        ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500'
+                                        : 'bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500'
+                                } text-white`}
                                 whileHover={{ scale: 1.05 }}
                                 whileTap={{ scale: 0.95 }}
                             >
-                                <span className="text-lg">🧪</span>
-                                <span className="whitespace-nowrap">音频兼容性测试</span>
-                                <div className="absolute inset-0 bg-gradient-to-r from-purple-400 to-purple-500 rounded-xl opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
-                            </motion.a>
+                                <span className="text-lg">🎛️</span>
+                                <span className="whitespace-nowrap">AI 音轨分离</span>
+                            </motion.button>
                         </motion.div>
+
+                        {/* AI 音轨分离面板 */}
+                        <AnimatePresence>
+                            {showStemSeparator && (
+                                <motion.div
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: 'auto' }}
+                                    exit={{ opacity: 0, height: 0 }}
+                                    transition={{ duration: 0.3 }}
+                                    className="mb-6 overflow-hidden"
+                                >
+                                    <Suspense fallback={
+                                        <div className="text-center p-8 text-gray-400">正在加载分离引擎…</div>
+                                    }>
+                                        <StemSeparator />
+                                    </Suspense>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </motion.header>
 
                     {/* 错误提示 */}

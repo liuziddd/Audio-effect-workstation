@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { EffectConfig, EffectType } from '../../types/audio';
+import { effectParameterDefinitions } from '../../utils/audioUtils';
 
 interface EffectItemProps {
     effect: EffectConfig;
@@ -11,63 +12,6 @@ interface EffectItemProps {
     onBypass: () => void;
     onUpdate: (parameters: Record<string, number>) => void;
 }
-
-// 每个效果器的默认参数配置
-const defaultEffectParameters: Record<EffectType, Record<string, { min: number; max: number; step: number; default: number; unit: string }>> = {
-    reverb: {
-        roomSize: { min: 0, max: 1, step: 0.01, default: 0.5, unit: '' },
-        decay: { min: 0, max: 10, step: 0.1, default: 2, unit: 's' },
-        wetness: { min: 0, max: 1, step: 0.01, default: 0.3, unit: '' },
-    },
-    eq: {
-        lowGain: { min: -20, max: 20, step: 0.5, default: 0, unit: 'dB' },
-        midGain: { min: -20, max: 20, step: 0.5, default: 0, unit: 'dB' },
-        highGain: { min: -20, max: 20, step: 0.5, default: 0, unit: 'dB' },
-        lowFreq: { min: 20, max: 500, step: 10, default: 200, unit: 'Hz' },
-        highFreq: { min: 2000, max: 20000, step: 100, default: 8000, unit: 'Hz' },
-    },
-    compressor: {
-        threshold: { min: -60, max: 0, step: 1, default: -20, unit: 'dB' },
-        ratio: { min: 1, max: 20, step: 0.5, default: 4, unit: ':1' },
-        attack: { min: 0, max: 1, step: 0.001, default: 0.01, unit: 's' },
-        release: { min: 0, max: 1, step: 0.01, default: 0.1, unit: 's' },
-    },
-    delay: {
-        time: { min: 0, max: 1, step: 0.01, default: 0.25, unit: 's' },
-        feedback: { min: 0, max: 0.9, step: 0.01, default: 0.3, unit: '' },
-        wetness: { min: 0, max: 1, step: 0.01, default: 0.3, unit: '' },
-    },
-    chorus: {
-        frequency: { min: 0.5, max: 10, step: 0.1, default: 2, unit: 'Hz' },
-        depth: { min: 0, max: 1, step: 0.01, default: 0.3, unit: '' },
-        wetness: { min: 0, max: 1, step: 0.01, default: 0.5, unit: '' },
-    },
-    phaser: {
-        frequency: { min: 0.1, max: 10, step: 0.1, default: 1, unit: 'Hz' },
-        depth: { min: 0, max: 1, step: 0.01, default: 0.5, unit: '' },
-        stages: { min: 2, max: 12, step: 1, default: 6, unit: '' },
-    },
-    distortion: {
-        drive: { min: 0, max: 1, step: 0.01, default: 0.3, unit: '' },
-        curve: { min: 0, max: 100, step: 1, default: 50, unit: '' },
-        oversample: { min: 1, max: 4, step: 1, default: 2, unit: 'x' },
-    },
-    filter: {
-        frequency: { min: 20, max: 20000, step: 10, default: 1000, unit: 'Hz' },
-        Q: { min: 0.1, max: 30, step: 0.1, default: 1, unit: '' },
-        gain: { min: -20, max: 20, step: 0.5, default: 0, unit: 'dB' },
-    },
-    limiter: {
-        threshold: { min: -30, max: 0, step: 0.5, default: -6, unit: 'dB' },
-        release: { min: 0.001, max: 1, step: 0.001, default: 0.01, unit: 's' },
-    },
-    gate: {
-        threshold: { min: -60, max: 0, step: 1, default: -30, unit: 'dB' },
-        ratio: { min: 1, max: 100, step: 1, default: 10, unit: ':1' },
-        attack: { min: 0, max: 1, step: 0.001, default: 0.001, unit: 's' },
-        release: { min: 0, max: 1, step: 0.01, default: 0.1, unit: 's' },
-    },
-};
 
 const effectIcons: Record<EffectType, string> = {
     reverb: '🌊',
@@ -106,7 +50,7 @@ export const EffectItem: React.FC<EffectItemProps> = ({
         opacity: isDragging ? 0.5 : 1,
     };
 
-    const effectParams = defaultEffectParameters[effect.type];
+    const effectParams = effectParameterDefinitions[effect.type];
 
     const handleParameterChange = (paramName: string, value: number) => {
         const newParameters = {
@@ -177,7 +121,7 @@ export const EffectItem: React.FC<EffectItemProps> = ({
                         return (
                             <div key={paramName} className="parameter-control">
                                 <label className="parameter-label">
-                                    {paramName}
+                                    {paramConfig.label}
                                     <span className="parameter-value">
                                         {currentValue.toFixed(paramConfig.step < 1 ? 3 : 1)}{paramConfig.unit}
                                     </span>

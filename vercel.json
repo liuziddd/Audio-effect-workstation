@@ -2,5 +2,20 @@
     "buildCommand": "yarn build",
     "installCommand": "yarn install",
     "outputDirectory": "dist",
-    "framework": "vite"
+    "framework": "vite",
+    "headers": [
+        {
+            "source": "/(.*)",
+            "headers": [
+                {
+                    "key": "Cross-Origin-Opener-Policy",
+                    "value": "same-origin"
+                },
+                {
+                    "key": "Cross-Origin-Embedder-Policy",
+                    "value": "credentialless"
+                }
+            ]
+        }
+    ]
 }

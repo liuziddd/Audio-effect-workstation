@@ -1,4 +1,3 @@
-import * as Tone from 'tone';
 import { EffectType } from '../types/audio';
 
 export const formatTime = (seconds: number): string => {
@@ -14,153 +13,77 @@ export const formatFileSize = (bytes: number): string => {
     return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
 };
 
-export const createEffect = (type: EffectType, config?: Record<string, number>): Tone.ToneAudioNode => {
-    switch (type) {
-        case 'reverb':
-            return new Tone.Reverb({
-                decay: config?.decay || 1.5,
-                preDelay: config?.preDelay || 0.01,
-                wet: config?.wet || 0.3
-            });
+export interface EffectParameterDefinition {
+    min: number;
+    max: number;
+    step: number;
+    default: number;
+    unit: string;
+    label: string;
+}
 
-        case 'eq':
-            return new Tone.EQ3({
-                low: config?.low || 0,
-                mid: config?.mid || 0,
-                high: config?.high || 0,
-                lowFrequency: config?.lowFrequency || 400,
-                highFrequency: config?.highFrequency || 2500
-            });
-
-        case 'compressor':
-            return new Tone.Compressor({
-                threshold: config?.threshold || -24,
-                ratio: config?.ratio || 3,
-                attack: config?.attack || 0.003,
-                release: config?.release || 0.25,
-                knee: config?.knee || 30
-            });
-
-        case 'delay':
-            return new Tone.FeedbackDelay({
-                delayTime: config?.delayTime || 0.25,
-                feedback: config?.feedback || 0.125,
-                wet: config?.wet || 0.2
-            });
-
-        case 'chorus':
-            return new Tone.Chorus({
-                frequency: config?.frequency || 1.5,
-                delayTime: config?.delayTime || 3.5,
-                depth: config?.depth || 0.7,
-                type: 'sine',
-                spread: config?.spread || 180,
-                wet: config?.wet || 0.3
-            });
-
-        case 'phaser':
-            return new Tone.Phaser({
-                frequency: config?.frequency || 0.5,
-                octaves: config?.octaves || 3,
-                stages: config?.stages || 10,
-                Q: config?.Q || 10,
-                baseFrequency: config?.baseFrequency || 350,
-                wet: config?.wet || 0.3
-            });
-
-        case 'distortion':
-            return new Tone.Distortion({
-                distortion: config?.distortion || 0.4,
-                oversample: '4x',
-                wet: config?.wet || 0.5
-            });
-
-        case 'filter':
-            return new Tone.Filter({
-                frequency: config?.frequency || 350,
-                type: 'lowpass',
-                rolloff: -12,
-                Q: config?.Q || 1,
-                gain: config?.gain || 0
-            });
-
-        case 'limiter':
-            return new Tone.Limiter({
-                threshold: config?.threshold || -12
-            });
-
-        case 'gate':
-            return new Tone.Gate({
-                threshold: config?.threshold || -50,
-                smoothing: config?.smoothing || 0.1
-            });
-
-        default:
-            throw new Error(`Unknown effect type: ${type}`);
-    }
+export const effectParameterDefinitions: Record<EffectType, Record<string, EffectParameterDefinition>> = {
+    reverb: {
+        decay: { min: 0.1, max: 10, step: 0.1, default: 2, unit: 's', label: '衰减时间' },
+        preDelay: { min: 0, max: 0.2, step: 0.005, default: 0.02, unit: 's', label: '预延迟' },
+        wetness: { min: 0, max: 1, step: 0.01, default: 0.3, unit: '', label: '湿声比例' },
+    },
+    eq: {
+        lowGain: { min: -15, max: 15, step: 0.5, default: 0, unit: 'dB', label: '低频增益' },
+        midGain: { min: -15, max: 15, step: 0.5, default: 0, unit: 'dB', label: '中频增益' },
+        highGain: { min: -15, max: 15, step: 0.5, default: 0, unit: 'dB', label: '高频增益' },
+        lowFreq: { min: 80, max: 500, step: 10, default: 200, unit: 'Hz', label: '低中频分频点' },
+        highFreq: { min: 2000, max: 8000, step: 100, default: 4000, unit: 'Hz', label: '中高频分频点' },
+    },
+    compressor: {
+        threshold: { min: -60, max: 0, step: 1, default: -18, unit: 'dB', label: '阈值' },
+        ratio: { min: 1, max: 20, step: 0.5, default: 3, unit: ':1', label: '压缩比' },
+        attack: { min: 0.001, max: 0.2, step: 0.001, default: 0.003, unit: 's', label: '启动时间' },
+        release: { min: 0.01, max: 1, step: 0.01, default: 0.25, unit: 's', label: '释放时间' },
+        knee: { min: 0, max: 40, step: 1, default: 12, unit: 'dB', label: '拐点宽度' },
+    },
+    delay: {
+        time: { min: 0.01, max: 1, step: 0.01, default: 0.25, unit: 's', label: '延迟时间' },
+        feedback: { min: 0, max: 0.9, step: 0.01, default: 0.25, unit: '', label: '反馈量' },
+        wetness: { min: 0, max: 1, step: 0.01, default: 0.25, unit: '', label: '湿声比例' },
+    },
+    chorus: {
+        frequency: { min: 0.1, max: 8, step: 0.1, default: 1.5, unit: 'Hz', label: '调制速率' },
+        delayTime: { min: 2, max: 20, step: 0.1, default: 3.5, unit: 'ms', label: '基础延迟' },
+        depth: { min: 0, max: 1, step: 0.01, default: 0.5, unit: '', label: '调制深度' },
+        spread: { min: 0, max: 360, step: 1, default: 180, unit: '°', label: '立体声宽度' },
+        wetness: { min: 0, max: 1, step: 0.01, default: 0.35, unit: '', label: '湿声比例' },
+    },
+    phaser: {
+        frequency: { min: 0.1, max: 8, step: 0.1, default: 0.8, unit: 'Hz', label: '调制速率' },
+        octaves: { min: 0.5, max: 6, step: 0.5, default: 3, unit: '', label: '扫频范围（八度）' },
+        stages: { min: 2, max: 12, step: 2, default: 6, unit: '', label: '级数' },
+        Q: { min: 0.5, max: 20, step: 0.5, default: 8, unit: '', label: '谐振强度' },
+        baseFrequency: { min: 50, max: 2000, step: 10, default: 350, unit: 'Hz', label: '基础频率' },
+        wetness: { min: 0, max: 1, step: 0.01, default: 0.5, unit: '', label: '湿声比例' },
+    },
+    distortion: {
+        drive: { min: 0, max: 1, step: 0.01, default: 0.3, unit: '', label: '失真量' },
+        oversample: { min: 0, max: 4, step: 2, default: 4, unit: 'x', label: '过采样（0=关闭）' },
+        wetness: { min: 0, max: 1, step: 0.01, default: 0.5, unit: '', label: '湿声比例' },
+    },
+    filter: {
+        frequency: { min: 20, max: 20000, step: 10, default: 1000, unit: 'Hz', label: '低通截止频率' },
+        Q: { min: 0.1, max: 20, step: 0.1, default: 0.7, unit: '', label: '谐振强度' },
+    },
+    limiter: {
+        threshold: { min: -30, max: 0, step: 0.5, default: -3, unit: 'dB', label: '限制阈值' },
+    },
+    gate: {
+        threshold: { min: -80, max: 0, step: 1, default: -45, unit: 'dB', label: '开门阈值' },
+        smoothing: { min: 0.005, max: 0.5, step: 0.005, default: 0.05, unit: 's', label: '包络平滑时间' },
+    },
 };
 
-export const getEffectParameters = (type: EffectType): Record<string, any> => {
-    const parameterDefinitions = {
-        reverb: {
-            decay: { min: 0.1, max: 10, step: 0.1, default: 1.5, unit: 's' },
-            preDelay: { min: 0, max: 1, step: 0.01, default: 0.01, unit: 's' },
-            wet: { min: 0, max: 1, step: 0.01, default: 0.3, unit: '' }
-        },
-        eq: {
-            low: { min: -15, max: 15, step: 0.5, default: 0, unit: 'dB' },
-            mid: { min: -15, max: 15, step: 0.5, default: 0, unit: 'dB' },
-            high: { min: -15, max: 15, step: 0.5, default: 0, unit: 'dB' },
-            lowFrequency: { min: 40, max: 1000, step: 10, default: 400, unit: 'Hz' },
-            highFrequency: { min: 1000, max: 10000, step: 100, default: 2500, unit: 'Hz' }
-        },
-        compressor: {
-            threshold: { min: -60, max: 0, step: 1, default: -24, unit: 'dB' },
-            ratio: { min: 1, max: 20, step: 0.1, default: 3, unit: ':1' },
-            attack: { min: 0, max: 1, step: 0.001, default: 0.003, unit: 's' },
-            release: { min: 0, max: 1, step: 0.01, default: 0.25, unit: 's' },
-            knee: { min: 0, max: 40, step: 1, default: 30, unit: 'dB' }
-        },
-        delay: {
-            delayTime: { min: 0, max: 1, step: 0.01, default: 0.25, unit: 's' },
-            feedback: { min: 0, max: 0.9, step: 0.01, default: 0.125, unit: '' },
-            wet: { min: 0, max: 1, step: 0.01, default: 0.2, unit: '' }
-        },
-        chorus: {
-            frequency: { min: 0.1, max: 10, step: 0.1, default: 1.5, unit: 'Hz' },
-            delayTime: { min: 1, max: 10, step: 0.1, default: 3.5, unit: 'ms' },
-            depth: { min: 0, max: 1, step: 0.01, default: 0.7, unit: '' },
-            spread: { min: 0, max: 360, step: 1, default: 180, unit: '°' },
-            wet: { min: 0, max: 1, step: 0.01, default: 0.3, unit: '' }
-        },
-        phaser: {
-            frequency: { min: 0.1, max: 10, step: 0.1, default: 0.5, unit: 'Hz' },
-            octaves: { min: 1, max: 8, step: 1, default: 3, unit: '' },
-            stages: { min: 2, max: 20, step: 1, default: 10, unit: '' },
-            Q: { min: 1, max: 30, step: 1, default: 10, unit: '' },
-            baseFrequency: { min: 50, max: 1000, step: 10, default: 350, unit: 'Hz' },
-            wet: { min: 0, max: 1, step: 0.01, default: 0.3, unit: '' }
-        },
-        distortion: {
-            distortion: { min: 0, max: 1, step: 0.01, default: 0.4, unit: '' },
-            wet: { min: 0, max: 1, step: 0.01, default: 0.5, unit: '' }
-        },
-        filter: {
-            frequency: { min: 20, max: 20000, step: 1, default: 350, unit: 'Hz' },
-            Q: { min: 0.1, max: 30, step: 0.1, default: 1, unit: '' },
-            gain: { min: -40, max: 40, step: 0.5, default: 0, unit: 'dB' }
-        },
-        limiter: {
-            threshold: { min: -60, max: 0, step: 1, default: -12, unit: 'dB' }
-        },
-        gate: {
-            threshold: { min: -80, max: -10, step: 1, default: -50, unit: 'dB' },
-            smoothing: { min: 0, max: 1, step: 0.01, default: 0.1, unit: 's' }
-        }
-    };
-
-    return parameterDefinitions[type] || {};
-};
+export const getDefaultEffectParameters = (type: EffectType): Record<string, number> =>
+    Object.fromEntries(
+        Object.entries(effectParameterDefinitions[type]).map(([name, definition]) => [name, definition.default])
+    );
 
 // 检查浏览器对音频格式的支持
 export const checkAudioSupport = () => {

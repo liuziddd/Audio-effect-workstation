@@ -12,6 +12,8 @@ interface AudioControls {
     play: () => Promise<void>;
     pause: () => void;
     stop: () => void;
+    beginSeek: () => void;
+    previewSeek: (time: number) => void;
     seek: (time: number) => void;
     setVolume: (volume: number) => void;
 }
@@ -38,17 +40,18 @@ export const SimpleAudioPlayer: React.FC<SimpleAudioPlayerProps> = ({
     onClearAudio,
     onSelectNewFile
 }) => {
-    // 调试信息 - 显示时长信息
-    React.useEffect(() => {
-        if (audioFile && controls) {
-            console.log('🎵 播放器时长信息:', {
-                '原始文件时长': audioFile.duration,
-                '控制器时长': controls.duration,
-                '当前时间': controls.currentTime,
-                '是否加载': controls.isLoaded
-            });
+    const isSeekingRef = React.useRef(false);
+    const seekTimeRef = React.useRef(0);
+
+    const finishSeek = (event: React.PointerEvent<HTMLInputElement>) => {
+        if (!controls || !isSeekingRef.current) return;
+        seekTimeRef.current = Number(event.currentTarget.value);
+        isSeekingRef.current = false;
+        controls.seek(seekTimeRef.current);
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId);
         }
-    }, [audioFile, controls]);
+    };
 
     if (!audioFile) {
         return (
@@ -126,7 +129,31 @@ export const SimpleAudioPlayer: React.FC<SimpleAudioPlayerProps> = ({
                                 min={0}
                                 max={displayDuration || 0}
                                 value={displayCurrentTime}
-                                onChange={(e) => controls.seek(parseFloat(e.target.value))}
+                                step={0.01}
+                                onPointerDown={(event) => {
+                                    if (!controls.isLoaded) return;
+                                    isSeekingRef.current = true;
+                                    seekTimeRef.current = controls.currentTime;
+                                    event.currentTarget.setPointerCapture(event.pointerId);
+                                    controls.beginSeek();
+                                }}
+                                onChange={(event) => {
+                                    const time = Number(event.target.value);
+                                    seekTimeRef.current = time;
+                                    if (isSeekingRef.current) {
+                                        controls.previewSeek(time);
+                                    } else {
+                                        controls.seek(time);
+                                    }
+                                }}
+                                onPointerUp={finishSeek}
+                                onPointerCancel={finishSeek}
+                                onLostPointerCapture={() => {
+                                    if (isSeekingRef.current) {
+                                        isSeekingRef.current = false;
+                                        controls.seek(seekTimeRef.current);
+                                    }
+                                }}
                                 disabled={!controls.isLoaded}
                                 className="progress-bar"
                                 aria-label="音频播放进度控制"

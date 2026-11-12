@@ -1,0 +1,192 @@
+.stem-separator {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 22px;
+    background: linear-gradient(to bottom right, rgba(17, 24, 39, 0.9), rgba(31, 41, 55, 0.9));
+    border: 1px solid rgba(79, 172, 254, 0.25);
+    border-radius: 12px;
+}
+
+.stem-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.stem-title {
+    font-weight: 600;
+    font-size: 1.1em;
+    background: linear-gradient(to right, #4facfe, #a855f7);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin: 0;
+}
+
+.stem-device {
+    font-size: 0.78em;
+    padding: 3px 10px;
+    border-radius: 999px;
+    border: 1px solid;
+}
+
+.stem-device.gpu {
+    color: #34d399;
+    border-color: rgba(52, 211, 153, 0.5);
+    background: rgba(52, 211, 153, 0.1);
+}
+
+.stem-device.cpu {
+    color: #fbbf24;
+    border-color: rgba(251, 191, 36, 0.5);
+    background: rgba(251, 191, 36, 0.1);
+}
+
+.stem-desc {
+    color: #9ca3af;
+    font-size: 0.85em;
+    line-height: 1.6;
+    margin: 0;
+}
+
+.stem-dropzone {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+    border: 1px dashed rgba(79, 172, 254, 0.5);
+    border-radius: 10px;
+    color: #93c5fd;
+    font-size: 0.95em;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+    overflow: hidden;
+    word-break: break-all;
+}
+
+.stem-dropzone:hover {
+    background: rgba(79, 172, 254, 0.08);
+    border-color: #4facfe;
+}
+
+.stem-dropzone.disabled {
+    opacity: 0.5;
+    cursor: wait;
+}
+
+.stem-dropzone input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.stem-progress-area {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: rgba(79, 172, 254, 0.06);
+    border: 1px solid rgba(79, 172, 254, 0.2);
+}
+
+.stem-status {
+    color: #93c5fd;
+    font-size: 0.88em;
+    margin: 0;
+}
+
+.stem-progress-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.8em;
+    color: #cbd5e1;
+}
+
+.stem-progress-row progress {
+    flex: 1;
+    height: 8px;
+    appearance: none;
+}
+
+.stem-progress-row progress::-webkit-progress-bar {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+}
+
+.stem-progress-row progress::-webkit-progress-value {
+    background: linear-gradient(to right, #4facfe, #a855f7);
+    border-radius: 4px;
+}
+
+.stem-error {
+    color: #f87171;
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 0.88em;
+    margin: 0;
+    word-break: break-all;
+}
+
+.stem-results {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 12px;
+}
+
+.stem-track {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 14px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+}
+
+.stem-track-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.9em;
+}
+
+.stem-track-name {
+    font-weight: 500;
+    color: #e2e8f0;
+}
+
+.stem-track-size {
+    color: #64748b;
+    font-size: 0.8em;
+}
+
+.stem-track audio {
+    width: 100%;
+    height: 36px;
+}
+
+.stem-download {
+    text-align: center;
+    padding: 7px 0;
+    border-radius: 8px;
+    background: linear-gradient(to right, rgba(79, 172, 254, 0.2), rgba(168, 85, 247, 0.2));
+    border: 1px solid rgba(79, 172, 254, 0.5);
+    color: #93c5fd;
+    font-size: 0.85em;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+
+.stem-download:hover {
+    background: linear-gradient(to right, rgba(79, 172, 254, 0.4), rgba(168, 85, 247, 0.4));
+    color: #e0f2fe;
+}
