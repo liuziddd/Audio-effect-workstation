@@ -1,193 +1,129 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import clsx from 'clsx';
+import React, { useCallback, useEffect, useRef } from 'react';
 
 interface KnobProps {
     value: number;
     min: number;
     max: number;
     step?: number;
+    defaultValue?: number;
     onChange: (value: number) => void;
     label?: string;
     unit?: string;
-    size?: 'sm' | 'md' | 'lg';
-    color?: 'blue' | 'purple' | 'green' | 'orange';
-    disabled?: boolean;
-    showValue?: boolean;
-    className?: string;
+    color?: string;
+    size?: number;
 }
 
+const START = -135;
+const END = 135;
+const SPAN = END - START;
+
+const polar = (cx: number, cy: number, r: number, deg: number) => {
+    const rad = ((deg - 90) * Math.PI) / 180;
+    return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+};
+
+const arc = (cx: number, cy: number, r: number, start: number, end: number) => {
+    const s = polar(cx, cy, r, end);
+    const e = polar(cx, cy, r, start);
+    const large = end - start <= 180 ? 0 : 1;
+    return `M ${s.x.toFixed(2)} ${s.y.toFixed(2)} A ${r} ${r} 0 ${large} 0 ${e.x.toFixed(2)} ${e.y.toFixed(2)}`;
+};
+
+const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
+
+const format = (val: number, step: number) => {
+    if (Math.abs(val) >= 1000) return (val / 1000).toFixed(1) + 'k';
+    if (step >= 1) return Math.round(val).toString();
+    if (step >= 0.1) return val.toFixed(1);
+    return step >= 0.01 ? val.toFixed(2) : val.toFixed(3);
+};
+
+/** 可视化旋钮：外围弧形光柱显示当前值，箭标指向光柱，支持拖拽/滚轮/双击重置 */
 export const Knob: React.FC<KnobProps> = ({
     value,
     min,
     max,
     step = 0.01,
+    defaultValue,
     onChange,
     label,
     unit = '',
-    size = 'md',
-    color = 'blue',
-    disabled = false,
-    showValue = true,
-    className = ''
+    color = '#00d4ff',
+    size = 44,
 }) => {
-    const [isDragging, setIsDragging] = useState(false);
-    const [startY, setStartY] = useState(0);
-    const [startValue, setStartValue] = useState(0);
-    const knobRef = useRef<HTMLDivElement>(null);
+    const drag = useRef<{ startY: number; startValue: number } | null>(null);
+    const rootRef = useRef<HTMLDivElement>(null);
 
-    const normalizedValue = (value - min) / (max - min);
-    const rotation = normalizedValue * 270 - 135; // -135° to 135° range
+    const stepRound = useCallback((v: number) => Math.round(v / step) * step, [step]);
 
-    const sizeClasses = {
-        sm: 'w-12 h-12',
-        md: 'w-16 h-16',
-        lg: 'w-20 h-20'
-    };
+    const onPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        drag.current = { startY: e.clientY, startValue: value };
+    }, [value]);
 
-    const colorClasses = {
-        blue: 'border-neon-blue',
-        purple: 'border-neon-purple',
-        green: 'border-neon-green',
-        orange: 'border-neon-orange'
-    };
+    const onPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+        if (!drag.current) return;
+        const dy = drag.current.startY - e.clientY;
+        const sensitivity = (max - min) / 200;
+        onChange(clamp(stepRound(drag.current.startValue + dy * sensitivity), min, max));
+    }, [max, min, onChange, stepRound]);
 
-    const handleMouseDown = useCallback((e: React.MouseEvent) => {
-        if (disabled) return;
-
-        e.preventDefault();
-        setIsDragging(true);
-        setStartY(e.clientY);
-        setStartValue(value);
-        document.body.style.cursor = 'ns-resize';
-    }, [disabled, value]);
-
-    const handleMouseMove = useCallback((e: MouseEvent) => {
-        if (!isDragging || disabled) return;
-
-        const deltaY = startY - e.clientY;
-        const sensitivity = 0.01;
-        const deltaValue = deltaY * sensitivity * (max - min);
-        const newValue = Math.max(min, Math.min(max, startValue + deltaValue));
-        const steppedValue = Math.round(newValue / step) * step;
-
-        onChange(steppedValue);
-    }, [isDragging, disabled, startY, startValue, min, max, step, onChange]);
-
-    const handleMouseUp = useCallback(() => {
-        setIsDragging(false);
-        document.body.style.cursor = '';
+    const onPointerUp = useCallback(() => {
+        drag.current = null;
     }, []);
 
-    const handleWheel = useCallback((e: React.WheelEvent) => {
-        if (disabled) return;
-
-        e.preventDefault();
-        const delta = -e.deltaY * 0.01;
-        const newValue = Math.max(min, Math.min(max, value + delta));
-        const steppedValue = Math.round(newValue / step) * step;
-
-        onChange(steppedValue);
-    }, [disabled, value, min, max, step, onChange]);
-
     useEffect(() => {
-        if (isDragging) {
-            document.addEventListener('mousemove', handleMouseMove);
-            document.addEventListener('mouseup', handleMouseUp);
+        const el = rootRef.current;
+        if (!el) return;
+        const onWheel = (e: WheelEvent) => {
+            e.preventDefault();
+            const amount = (max - min) * 0.01 * (e.shiftKey ? 0.1 : 1);
+            onChange(clamp(stepRound(value + (e.deltaY < 0 ? amount : -amount)), min, max));
+        };
+        el.addEventListener('wheel', onWheel, { passive: false });
+        return () => el.removeEventListener('wheel', onWheel);
+    }, [value, min, max, onChange, stepRound]);
 
-            return () => {
-                document.removeEventListener('mousemove', handleMouseMove);
-                document.removeEventListener('mouseup', handleMouseUp);
-            };
-        }
-    }, [isDragging, handleMouseMove, handleMouseUp]);
-
-    const formatValue = (val: number): string => {
-        if (Math.abs(val) >= 1000) {
-            return (val / 1000).toFixed(1) + 'k';
-        }
-        return val.toFixed(step < 1 ? 2 : 0);
-    };
+    const normalized = (value - min) / (max - min);
+    const angle = START + normalized * SPAN;
+    const cx = 50;
+    const cy = 50;
+    const arcR = 42;
+    const knobR = 27;
 
     return (
-        <div className={clsx('flex flex-col items-center space-y-2', className)}>
-            {label && (
-                <label className="text-xs text-gray-400 font-medium no-select">
-                    {label}
-                </label>
-            )}
-
-            <div className="relative">
-                <motion.div
-                    ref={knobRef}
-                    className={clsx(
-                        'knob-container relative cursor-pointer no-select',
-                        sizeClasses[size]
-                    )}
-                    onMouseDown={handleMouseDown}
-                    onWheel={handleWheel}
-                    whileHover={!disabled ? { scale: 1.05 } : {}}
-                    whileTap={!disabled ? { scale: 0.95 } : {}}
-                >
-                    <div
-                        className={clsx(
-                            'knob relative',
-                            colorClasses[color],
-                            {
-                                'opacity-50 cursor-not-allowed': disabled,
-                                'hover:shadow-neon': !disabled
-                            }
-                        )}
-                        style={{
-                            transform: `rotate(${rotation}deg)`,
-                            transition: isDragging ? 'none' : 'transform 0.1s ease-out'
-                        }}
-                    >
-                        {/* 指针 */}
-                        <div
-                            className={clsx(
-                                'absolute w-0.5 h-4 rounded-full top-1 left-1/2 transform -translate-x-1/2',
-                                `bg-${color === 'blue' ? 'neon-blue' : color === 'purple' ? 'neon-purple' : color === 'green' ? 'neon-green' : 'neon-orange'}`
-                            )}
-                        />
-
-                        {/* 中心点 */}
-                        <div className="absolute w-2 h-2 bg-gray-800 rounded-full top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
-                    </div>
-
-                    {/* 刻度标记 */}
-                    <div className="absolute inset-0">
-                        {Array.from({ length: 11 }, (_, i) => {
-                            const angle = -135 + (i * 27); // 每27度一个刻度
-                            return (
-                                <div
-                                    key={i}
-                                    className="absolute w-0.5 h-1 bg-gray-600"
-                                    style={{
-                                        top: '10%',
-                                        left: '50%',
-                                        transformOrigin: '50% 200%',
-                                        transform: `translateX(-50%) rotate(${angle}deg)`
-                                    }}
-                                />
-                            );
-                        })}
-                    </div>
-                </motion.div>
-
-                {/* 拖拽指示器 */}
-                {isDragging && (
-                    <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 text-xs text-neon-blue bg-gray-900 px-2 py-1 rounded">
-                        {formatValue(value)}{unit}
-                    </div>
+        <div
+            ref={rootRef}
+            className="knob"
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onDoubleClick={() => defaultValue !== undefined && onChange(defaultValue)}
+        >
+            <svg viewBox="0 0 100 100" width={size} height={size}>
+                {/* 外围光柱底环 */}
+                <path d={arc(cx, cy, arcR, START, END)} stroke="#262a38" strokeWidth={6} fill="none" strokeLinecap="round" />
+                {/* 当前值光柱 */}
+                {value > min && (
+                    <path
+                        d={arc(cx, cy, arcR, START, angle)}
+                        stroke={color}
+                        strokeWidth={6}
+                        fill="none"
+                        strokeLinecap="round"
+                        style={{ filter: `drop-shadow(0 0 5px ${color})` }}
+                    />
                 )}
-            </div>
-
-            {showValue && (
-                <div className="text-xs text-center text-gray-300 no-select min-w-[3rem]">
-                    {formatValue(value)}{unit}
-                </div>
-            )}
+                {/* 旋钮盘 */}
+                <circle cx={cx} cy={cy} r={knobR} fill="#181a26" stroke="#2a2e3d" strokeWidth={1.5} />
+                <circle cx={cx} cy={cy} r={knobR * 0.68} fill="#202331" stroke="#262a38" strokeWidth={1} />
+                {/* 箭标 */}
+                <g transform={`rotate(${angle} ${cx} ${cy})`}>
+                    <line x1={cx} y1={cy - knobR * 0.55} x2={cx} y2={cy - knobR + 3} stroke={color} strokeWidth={2.5} strokeLinecap="round" />
+                </g>
+            </svg>
+            {label && <span className="knob-label">{label}</span>}
+            <span className="knob-value">{format(value, step)}{unit}</span>
         </div>
     );
-}; 
+};

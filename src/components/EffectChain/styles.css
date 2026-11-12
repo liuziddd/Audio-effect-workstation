@@ -44,18 +44,21 @@
     font-weight: 500;
 }
 
-/* 空状态 */
-.effect-chain-empty {
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-    border: 1px solid #2a2d3a;
-    border-radius: 16px;
-    padding: 40px 24px;
-    text-align: center;
+/* 拖拽效果器到链时的目标高亮 */
+.effect-chain.drop-target {
+    border-color: #00d4ff;
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.4),
+        0 0 0 2px rgba(0, 212, 255, 0.4),
+        0 0 40px rgba(0, 212, 255, 0.25);
 }
 
-.empty-state {
+/* 空状态 */
+.effect-chain .empty-state {
     max-width: 300px;
     margin: 0 auto;
+    text-align: center;
+    padding: 16px 0;
 }
 
 .empty-icon {
@@ -89,7 +92,7 @@
     background: linear-gradient(135deg, #2a2d3a 0%, #1e1e30 100%);
     border: 1px solid #3a3d4a;
     border-radius: 12px;
-    padding: 16px;
+    padding: 12px;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     overflow: hidden;
@@ -116,15 +119,6 @@
     opacity: 0.5;
 }
 
-.effect-item.bypassed {
-    border-color: #ffa500;
-}
-
-.effect-item.bypassed::before {
-    background: linear-gradient(135deg, rgba(255, 165, 0, 0.1) 0%, rgba(255, 165, 0, 0.05) 100%);
-    opacity: 1;
-}
-
 .effect-item.dragging {
     transform: rotate(2deg);
     box-shadow:
@@ -137,7 +131,7 @@
 .effect-header {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     position: relative;
     z-index: 1;
 }
@@ -226,12 +220,6 @@
     box-shadow: 0 0 12px rgba(0, 212, 255, 0.3);
 }
 
-.bypass-btn.active {
-    background: rgba(255, 165, 0, 0.2);
-    border-color: #ffa500;
-    box-shadow: 0 0 12px rgba(255, 165, 0, 0.3);
-}
-
 .remove-btn:hover {
     background: rgba(255, 69, 58, 0.2);
     border-color: #ff4539;
@@ -239,20 +227,160 @@
 
 /* 效果器参数控制 */
 .effect-parameters {
-    margin-top: 16px;
-    padding-top: 16px;
+    margin-top: 10px;
+    padding-top: 10px;
     border-top: 1px solid rgba(255, 255, 255, 0.1);
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
     position: relative;
     z-index: 1;
+}
+
+/* 旋钮网格 */
+.knob-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 6px;
+}
+
+.knob {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    user-select: none;
+    touch-action: none;
+    cursor: ns-resize;
+}
+
+.knob-label {
+    font-size: 10px;
+    color: #8a8f9d;
+    text-align: center;
+    white-space: nowrap;
+    max-width: 56px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.knob-value {
+    font-size: 10px;
+    font-family: 'Courier New', monospace;
+    color: #00d4ff;
+    font-weight: 600;
+    line-height: 1;
+}
+
+/* 滑块/下拉参数区 */
+.param-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
 }
 
 .parameter-control {
     display: flex;
     flex-direction: column;
     gap: 8px;
+}
+
+.parameter-select {
+    background: #181a26;
+    border: 1px solid #2a2e3d;
+    color: #ffffff;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 0.9em;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.2s ease;
+}
+
+.parameter-select:hover {
+    border-color: #00d4ff;
+}
+
+/* EQ 图形化 */
+.eq-graph {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* 波形整形 / 动态曲线图形化 */
+.shaper-graph,
+.dynamics-graph {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.eq-hint {
+    margin: 0;
+    font-size: 0.75em;
+    color: #5b6172;
+    text-align: center;
+}
+
+/* EQ 频段参数面板（紧凑一行） */
+.eq-panel {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    padding: 8px 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 8px;
+}
+
+.eq-type {
+    background: #181a26;
+    border: 1px solid #2a2e3d;
+    color: #ffffff;
+    border-radius: 6px;
+    padding: 5px 6px;
+    font-size: 12px;
+    cursor: pointer;
+    outline: none;
+    height: 28px;
+}
+
+.eq-type:hover {
+    border-color: #00d4ff;
+}
+
+.eq-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-width: 80px;
+}
+
+.eq-field span {
+    font-size: 11px;
+    color: #8a8f9d;
+    white-space: nowrap;
+}
+
+.eq-field input[type='range'] {
+    width: 100%;
+}
+
+.eq-delete {
+    background: rgba(255, 69, 58, 0.15);
+    border: 1px solid rgba(255, 69, 58, 0.4);
+    color: #ff6b5e;
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    height: 28px;
+    white-space: nowrap;
+}
+
+.eq-delete:hover {
+    background: rgba(255, 69, 58, 0.3);
 }
 
 .parameter-label {
@@ -365,11 +493,6 @@
         min-width: 32px;
         height: 32px;
         font-size: 0.9em;
-    }
-    
-    .effect-parameters {
-        grid-template-columns: 1fr;
-        gap: 12px;
     }
     
     .parameter-label {

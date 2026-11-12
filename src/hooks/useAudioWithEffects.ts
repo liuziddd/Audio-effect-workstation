@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import * as Tone from 'tone';
-import { EffectConfig, EffectType } from '../types/audio';
+import { EffectConfig, EffectType, EqBandData, ShaperPoint } from '../types/audio';
 import { AudioEffectsProcessor, getEffectsTailDuration } from '../utils/audioEffects';
-import { getDefaultEffectParameters } from '../utils/audioUtils';
+import { getDefaultEffectParameters, createDefaultEqBands, createDefaultShaperPoints } from '../utils/audioUtils';
 
 interface UseAudioWithEffectsReturn {
     isPlaying: boolean;
@@ -23,8 +23,9 @@ interface UseAudioWithEffectsReturn {
     addEffect: (effectType: EffectType) => void;
     removeEffect: (effectId: string) => void;
     toggleEffect: (effectId: string) => void;
-    bypassEffect: (effectId: string) => void;
     updateEffect: (effectId: string, parameters: Record<string, number>) => void;
+    updateEffectEqBands: (effectId: string, bands: EqBandData[]) => void;
+    updateEffectShaperPoints: (effectId: string, points: ShaperPoint[]) => void;
     reorderEffects: (effects: EffectConfig[]) => void;
     exportAudio: (filename?: string) => Promise<void>;
 }
@@ -323,8 +324,8 @@ export const useAudioWithEffects = (): UseAudioWithEffectsReturn => {
             enabled: true,
             parameters: getDefaultEffectParameters(effectType),
             order: previous.length,
-            instanceId: effectId,
-            bypass: false,
+            ...(effectType === 'eq' ? { eqBands: createDefaultEqBands() } : {}),
+            ...(effectType === 'distortion' ? { shaperPoints: createDefaultShaperPoints() } : {}),
         }]);
     }, []);
 
@@ -341,17 +342,23 @@ export const useAudioWithEffects = (): UseAudioWithEffectsReturn => {
         ));
     }, []);
 
-    const bypassEffect = useCallback((effectId: string) => {
-        setEffects(previous => previous.map(effect =>
-            effect.id === effectId ? { ...effect, bypass: !effect.bypass } : effect
-        ));
-    }, []);
-
     const updateEffect = useCallback((effectId: string, parameters: Record<string, number>) => {
         setEffects(previous => previous.map(effect =>
             effect.id === effectId
                 ? { ...effect, parameters: { ...effect.parameters, ...parameters } }
                 : effect
+        ));
+    }, []);
+
+    const updateEffectEqBands = useCallback((effectId: string, bands: EqBandData[]) => {
+        setEffects(previous => previous.map(effect =>
+            effect.id === effectId ? { ...effect, eqBands: bands } : effect
+        ));
+    }, []);
+
+    const updateEffectShaperPoints = useCallback((effectId: string, points: ShaperPoint[]) => {
+        setEffects(previous => previous.map(effect =>
+            effect.id === effectId ? { ...effect, shaperPoints: points } : effect
         ));
     }, []);
 
@@ -414,8 +421,9 @@ export const useAudioWithEffects = (): UseAudioWithEffectsReturn => {
         addEffect,
         removeEffect,
         toggleEffect,
-        bypassEffect,
         updateEffect,
+        updateEffectEqBands,
+        updateEffectShaperPoints,
         reorderEffects,
         exportAudio,
     };

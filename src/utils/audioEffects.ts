@@ -1,24 +1,9 @@
 import * as Tone from 'tone';
-import { EffectConfig } from '../types/audio';
-
-type EffectNode =
-    | Tone.Reverb
-    | Tone.EQ3
-    | Tone.Compressor
-    | Tone.FeedbackDelay
-    | Tone.Chorus
-    | Tone.Phaser
-    | Tone.Distortion
-    | Tone.Filter
-    | Tone.Limiter
-    | Tone.Gate;
-
-interface EffectEntry {
-    node: EffectNode;
-    config: EffectConfig;
-}
+import { EffectConfig, EqBandData, ShaperPoint } from '../types/audio';
 
 const PARAMETER_RAMP_TIME = 0.02;
+
+const FILTER_TYPES = ['lowpass', 'highpass', 'bandpass', 'notch', 'peaking', 'lowshelf', 'highshelf'] as const;
 
 const oversampleType = (value = 4): OverSampleType => {
     if (value >= 4) return '4x';
@@ -26,12 +11,404 @@ const oversampleType = (value = 4): OverSampleType => {
     return 'none';
 };
 
+/** 生成指数衰减的立体声冲激响应（用于卷积混响，支持 size/damping 塑造空间感） */
+const generateImpulseResponse = (decay: number, size: number, damping: number, preDelay: number): AudioBuffer => {
+    const sampleRate = Tone.context.sampleRate;
+    const tailSeconds = Math.min(decay * size, 8);
+    const length = Math.max(1, Math.floor(sampleRate * tailSeconds));
+    const preSamples = Math.floor(sampleRate * preDelay);
+    const total = length + preSamples;
+    const buffer = Tone.context.createBuffer(2, total, sampleRate);
+
+    const cutoff = Math.max(200, (1 - damping) * 12000);
+    const lpCoeff = Math.exp((-2 * Math.PI * cutoff) / sampleRate);
+
+    for (let ch = 0; ch < 2; ch++) {
+        const data = buffer.getChannelData(ch);
+        let lp = 0;
+        for (let i = preSamples; i < total; i++) {
+            const t = (i - preSamples) / sampleRate;
+            const noise = Math.random() * 2 - 1;
+            lp += (noise - lp) * (1 - lpCoeff);
+            data[i] = lp * Math.exp((-3 * t) / decay) * 0.35;
+        }
+    }
+    return buffer;
+};
+
+/** 从控制点生成 WaveShaper 曲线（Catmull-Rom 样条，采样 length 点，输入范围 -1..1） */
+const buildShaperCurve = (points: ShaperPoint[], length = 2048): Float32Array => {
+    const pts = [...points].sort((a, b) => a.x - b.x);
+    const n = pts.length;
+    if (n === 0) {
+        // 空曲线退化为直线（无失真）
+        const linear = new Float32Array(length);
+        for (let i = 0; i < length; i++) linear[i] = (i / (length - 1)) * 2 - 1;
+        return linear;
+    }
+    const xs = pts.map((p) => p.x);
+    const ys = pts.map((p) => p.y);
+    const curve = new Float32Array(length);
+    for (let i = 0; i < length; i++) {
+        const x = (i / (length - 1)) * 2 - 1;
+        let seg = 0;
+        while (seg < n - 1 && x > xs[seg + 1]) seg++;
+        const p0 = Math.max(0, seg - 1);
+        const p1 = seg;
+        const p2 = Math.min(n - 1, seg + 1);
+        const p3 = Math.min(n - 1, seg + 2);
+        const t = (x - xs[p1]) / (xs[p2] - xs[p1] || 1);
+        const tt = t * t;
+        const y = 0.5 * (
+            (2 * ys[p1]) +
+            (-ys[p0] + ys[p2]) * t +
+            (2 * ys[p0] - 5 * ys[p1] + 4 * ys[p2] - ys[p3]) * tt +
+            (-ys[p0] + 3 * ys[p1] - 3 * ys[p2] + ys[p3]) * tt * t
+        );
+        curve[i] = Math.max(-1, Math.min(1, y));
+    }
+    return curve;
+};
+
+/** 效果器统一接口：input/output 之间可组合任意数量的节点 */
+interface EffectModule {
+    input: Tone.ToneAudioNode;
+    output: Tone.ToneAudioNode;
+    update: (config: EffectConfig) => void;
+    dispose: () => void;
+}
+
+/** 干湿并行结构：wet 链 + dry 链汇入 output，wet 处理链由调用者接入 wet 节点 */
+const wetDry = (mix: number) => {
+    const input = new Tone.Gain(1);
+    const wet = new Tone.Gain(mix);
+    const dry = new Tone.Gain(1 - mix);
+    const output = new Tone.Gain(1);
+    wet.connect(output);
+    input.connect(dry);
+    dry.connect(output);
+    return {
+        input,
+        output,
+        wet,
+        dry,
+        setMix(value: number) {
+            wet.gain.rampTo(value, PARAMETER_RAMP_TIME);
+            dry.gain.rampTo(1 - value, PARAMETER_RAMP_TIME);
+        },
+    };
+};
+
+const createModule = (config: EffectConfig): EffectModule => {
+    const p = config.parameters;
+
+    switch (config.type) {
+        case 'reverb': {
+            // 卷积混响：IR 由 decay/size/damping/preDelay 生成，音色自然但调参需重算 IR
+            let ir = { d: p.decay ?? 3, s: p.size ?? 1, dam: p.damping ?? 0.5, pd: p.preDelay ?? 0.02 };
+            const convolver = new Tone.Convolver(new Tone.ToneAudioBuffer(generateImpulseResponse(ir.d, ir.s, ir.dam, ir.pd)));
+            const mix = wetDry(p.mix ?? 0.35);
+            mix.input.connect(convolver);
+            convolver.connect(mix.wet);
+            return {
+                input: mix.input,
+                output: mix.output,
+                update(config) {
+                    const params = config.parameters;
+                    if (params.mix !== undefined) mix.setMix(params.mix);
+                    const d = params.decay ?? ir.d;
+                    const s = params.size ?? ir.s;
+                    const dam = params.damping ?? ir.dam;
+                    const pd = params.preDelay ?? ir.pd;
+                    if (d !== ir.d || s !== ir.s || dam !== ir.dam || pd !== ir.pd) {
+                        ir = { d, s, dam, pd };
+                        convolver.buffer = new Tone.ToneAudioBuffer(generateImpulseResponse(d, s, dam, pd));
+                    }
+                },
+                dispose() {
+                    mix.input.disconnect();
+                    mix.output.disconnect();
+                    convolver.dispose();
+                    mix.wet.dispose();
+                    mix.dry.dispose();
+                    mix.input.dispose();
+                    mix.output.dispose();
+                },
+            };
+        }
+
+        case 'eq': {
+            const filters: Tone.Filter[] = (config.eqBands ?? []).map((band) => {
+                const filter = new Tone.Filter(band.freq, band.type, -12);
+                filter.Q.value = band.q;
+                filter.gain.value = band.gain;
+                return filter;
+            });
+            const input = new Tone.Gain(1);
+            const output = new Tone.Gain(1);
+            input.chain(...filters, output);
+
+            const applyBand = (filter: Tone.Filter, band: EqBandData) => {
+                if (filter.type !== band.type) filter.type = band.type;
+                filter.frequency.rampTo(band.freq, PARAMETER_RAMP_TIME);
+                filter.Q.rampTo(band.q, PARAMETER_RAMP_TIME);
+                // gain 为 dB 可负，指数 ramp 无法到达负值，改用线性 ramp
+                filter.gain.linearRampTo(band.gain, PARAMETER_RAMP_TIME);
+            };
+
+            return {
+                input,
+                output,
+                update(config) {
+                    // 频点数量变化由 shouldRebuild 触发重建，这里实时处理类型切换与 freq/gain/q
+                    (config.eqBands ?? []).forEach((band, i) => {
+                        if (filters[i]) applyBand(filters[i], band);
+                    });
+                },
+                dispose() {
+                    input.disconnect();
+                    filters.forEach((f) => f.dispose());
+                    input.dispose();
+                    output.dispose();
+                },
+            };
+        }
+
+        case 'compressor': {
+            const compressor = new Tone.Compressor({
+                threshold: p.threshold ?? -18,
+                ratio: p.ratio ?? 3,
+                attack: p.attack ?? 0.003,
+                release: p.release ?? 0.25,
+                knee: p.knee ?? 12,
+            });
+            const makeup = new Tone.Gain(Tone.dbToGain(p.makeup ?? 0));
+            const input = new Tone.Gain(1);
+            const output = new Tone.Gain(1);
+            input.chain(compressor, makeup, output);
+            return {
+                input,
+                output,
+                update(config) {
+                    const params = config.parameters;
+                    if (params.threshold !== undefined) compressor.threshold.rampTo(params.threshold, PARAMETER_RAMP_TIME);
+                    if (params.ratio !== undefined) compressor.ratio.rampTo(params.ratio, PARAMETER_RAMP_TIME);
+                    if (params.attack !== undefined) compressor.attack.rampTo(params.attack, PARAMETER_RAMP_TIME);
+                    if (params.release !== undefined) compressor.release.rampTo(params.release, PARAMETER_RAMP_TIME);
+                    if (params.knee !== undefined) compressor.knee.rampTo(params.knee, PARAMETER_RAMP_TIME);
+                    if (params.makeup !== undefined) makeup.gain.rampTo(Tone.dbToGain(params.makeup), PARAMETER_RAMP_TIME);
+                },
+                dispose() {
+                    input.disconnect();
+                    compressor.dispose();
+                    makeup.dispose();
+                    input.dispose();
+                    output.dispose();
+                },
+            };
+        }
+
+        case 'delay': {
+            const delay = new Tone.FeedbackDelay({ delayTime: p.time ?? 0.25, feedback: p.feedback ?? 0.25, wet: 1 });
+            const tone = new Tone.Filter(p.tone ?? 4000, 'lowpass');
+            const mix = wetDry(p.mix ?? 0.25);
+            mix.input.connect(delay);
+            delay.connect(tone);
+            tone.connect(mix.wet);
+            return {
+                input: mix.input,
+                output: mix.output,
+                update(config) {
+                    const params = config.parameters;
+                    if (params.time !== undefined) delay.delayTime.rampTo(params.time, PARAMETER_RAMP_TIME);
+                    if (params.feedback !== undefined) delay.feedback.rampTo(params.feedback, PARAMETER_RAMP_TIME);
+                    if (params.tone !== undefined) tone.frequency.rampTo(params.tone, PARAMETER_RAMP_TIME);
+                    if (params.mix !== undefined) mix.setMix(params.mix);
+                },
+                dispose() {
+                    mix.input.disconnect();
+                    mix.output.disconnect();
+                    delay.dispose();
+                    tone.dispose();
+                    mix.wet.dispose();
+                    mix.dry.dispose();
+                    mix.input.dispose();
+                    mix.output.dispose();
+                },
+            };
+        }
+
+        case 'chorus': {
+            const chorus = new Tone.Chorus({
+                frequency: p.rate ?? 1.5,
+                delayTime: p.delay ?? 3.5,
+                depth: p.depth ?? 0.5,
+                feedback: p.feedback ?? 0,
+                spread: p.spread ?? 180,
+                type: 'sine',
+                wet: p.mix ?? 0.35,
+            }).start();
+            return {
+                input: chorus,
+                output: chorus,
+                update(config) {
+                    const params = config.parameters;
+                    if (params.rate !== undefined) chorus.frequency.rampTo(params.rate, PARAMETER_RAMP_TIME);
+                    if (params.delay !== undefined) chorus.delayTime = params.delay;
+                    if (params.depth !== undefined) chorus.depth = params.depth;
+                    if (params.feedback !== undefined) chorus.feedback.rampTo(params.feedback, PARAMETER_RAMP_TIME);
+                    if (params.spread !== undefined) chorus.spread = params.spread;
+                    if (params.mix !== undefined) chorus.wet.rampTo(params.mix, PARAMETER_RAMP_TIME);
+                },
+                dispose() {
+                    chorus.dispose();
+                },
+            };
+        }
+
+        case 'phaser': {
+            const phaser = new Tone.Phaser({
+                frequency: p.rate ?? 0.8,
+                octaves: p.octaves ?? 3,
+                stages: Math.round(p.stages ?? 6),
+                Q: p.Q ?? 8,
+                baseFrequency: p.baseFrequency ?? 350,
+                wet: p.mix ?? 0.5,
+            });
+            return {
+                input: phaser,
+                output: phaser,
+                update(config) {
+                    const params = config.parameters;
+                    if (params.rate !== undefined) phaser.frequency.rampTo(params.rate, PARAMETER_RAMP_TIME);
+                    if (params.octaves !== undefined) phaser.octaves = params.octaves;
+                    if (params.Q !== undefined) phaser.Q.rampTo(params.Q, PARAMETER_RAMP_TIME);
+                    if (params.baseFrequency !== undefined) phaser.baseFrequency = params.baseFrequency;
+                    if (params.mix !== undefined) phaser.wet.rampTo(params.mix, PARAMETER_RAMP_TIME);
+                },
+                dispose() {
+                    phaser.dispose();
+                },
+            };
+        }
+
+        case 'distortion': {
+            // FL WaveShaper 风格：drive → 可编辑波形整形曲线 → output → 低通 → 干湿混合
+            const drive = new Tone.Gain(Tone.dbToGain(p.drive ?? 0));
+            const shaper = new Tone.WaveShaper(buildShaperCurve(config.shaperPoints ?? []));
+            shaper.oversample = oversampleType(p.oversample);
+            const outputGain = new Tone.Gain(Tone.dbToGain(p.output ?? 0));
+            const tone = new Tone.Filter(p.tone ?? 10000, 'lowpass');
+            const mix = wetDry(p.mix ?? 0.5);
+            mix.input.connect(drive);
+            drive.connect(shaper);
+            shaper.connect(outputGain);
+            outputGain.connect(tone);
+            tone.connect(mix.wet);
+            return {
+                input: mix.input,
+                output: mix.output,
+                update(config) {
+                    const params = config.parameters;
+                    if (params.drive !== undefined) drive.gain.rampTo(Tone.dbToGain(params.drive), PARAMETER_RAMP_TIME);
+                    if (params.output !== undefined) outputGain.gain.rampTo(Tone.dbToGain(params.output), PARAMETER_RAMP_TIME);
+                    if (params.tone !== undefined) tone.frequency.rampTo(params.tone, PARAMETER_RAMP_TIME);
+                    if (params.mix !== undefined) mix.setMix(params.mix);
+                    if (params.oversample !== undefined) shaper.oversample = oversampleType(params.oversample);
+                    if (config.shaperPoints !== undefined) shaper.curve = buildShaperCurve(config.shaperPoints);
+                },
+                dispose() {
+                    mix.input.disconnect();
+                    mix.output.disconnect();
+                    drive.dispose();
+                    shaper.dispose();
+                    outputGain.dispose();
+                    tone.dispose();
+                    mix.wet.dispose();
+                    mix.dry.dispose();
+                    mix.input.dispose();
+                    mix.output.dispose();
+                },
+            };
+        }
+
+        case 'filter': {
+            const filter = new Tone.Filter(p.frequency ?? 1000, FILTER_TYPES[p.type ?? 0] ?? 'lowpass', -12);
+            filter.Q.value = p.Q ?? 0.707;
+            filter.gain.value = p.gain ?? 0;
+            return {
+                input: filter,
+                output: filter,
+                update(config) {
+                    const params = config.parameters;
+                    if (params.type !== undefined) filter.type = FILTER_TYPES[params.type] ?? 'lowpass';
+                    if (params.frequency !== undefined) filter.frequency.rampTo(params.frequency, PARAMETER_RAMP_TIME);
+                    if (params.Q !== undefined) filter.Q.rampTo(params.Q, PARAMETER_RAMP_TIME);
+                    if (params.gain !== undefined) filter.gain.linearRampTo(params.gain, PARAMETER_RAMP_TIME);
+                },
+                dispose() {
+                    filter.dispose();
+                },
+            };
+        }
+
+        case 'limiter': {
+            // FL Limiter 风格：输入增益 → 高比率压缩(20:1 砖墙) → 输出上限(ceiling)
+            const inputGain = new Tone.Gain(Tone.dbToGain(p.gain ?? 0));
+            const compressor = new Tone.Compressor({
+                threshold: p.threshold ?? -3,
+                ratio: 20,
+                attack: p.attack ?? 0.003,
+                release: p.release ?? 0.1,
+                knee: 0,
+            });
+            const ceiling = new Tone.Gain(Tone.dbToGain(p.ceiling ?? -0.1));
+            inputGain.connect(compressor);
+            compressor.connect(ceiling);
+            return {
+                input: inputGain,
+                output: ceiling,
+                update(config) {
+                    const params = config.parameters;
+                    if (params.gain !== undefined) inputGain.gain.rampTo(Tone.dbToGain(params.gain), PARAMETER_RAMP_TIME);
+                    if (params.threshold !== undefined) compressor.threshold.rampTo(params.threshold, PARAMETER_RAMP_TIME);
+                    if (params.attack !== undefined) compressor.attack.rampTo(params.attack, PARAMETER_RAMP_TIME);
+                    if (params.release !== undefined) compressor.release.rampTo(params.release, PARAMETER_RAMP_TIME);
+                    if (params.ceiling !== undefined) ceiling.gain.rampTo(Tone.dbToGain(params.ceiling), PARAMETER_RAMP_TIME);
+                },
+                dispose() {
+                    inputGain.disconnect();
+                    compressor.dispose();
+                    ceiling.dispose();
+                    inputGain.dispose();
+                },
+            };
+        }
+
+        case 'gate': {
+            const gate = new Tone.Gate({ threshold: p.threshold ?? -45, smoothing: p.smoothing ?? 0.05 });
+            return {
+                input: gate,
+                output: gate,
+                update(config) {
+                    const params = config.parameters;
+                    if (params.threshold !== undefined) gate.threshold = params.threshold;
+                    if (params.smoothing !== undefined) gate.smoothing = params.smoothing;
+                },
+                dispose() {
+                    gate.dispose();
+                },
+            };
+        }
+    }
+};
+
 export const getEffectsTailDuration = (effectConfigs: EffectConfig[]): number => {
     const tails = effectConfigs
-        .filter(config => config.enabled && !config.bypass)
-        .map(config => {
+        .filter((config) => config.enabled)
+        .map((config) => {
             if (config.type === 'reverb') {
-                return (config.parameters.decay ?? 2) + (config.parameters.preDelay ?? 0);
+                return (config.parameters.decay ?? 3) + (config.parameters.preDelay ?? 0);
             }
             if (config.type === 'delay') {
                 const delayTime = config.parameters.time ?? 0.25;
@@ -46,6 +423,11 @@ export const getEffectsTailDuration = (effectConfigs: EffectConfig[]): number =>
     return Math.min(Math.max(...tails, 0), 30);
 };
 
+interface EffectEntry {
+    module: EffectModule;
+    config: EffectConfig;
+}
+
 export class AudioEffectsProcessor {
     private effects = new Map<string, EffectEntry>();
     private input = new Tone.Gain(1);
@@ -56,229 +438,82 @@ export class AudioEffectsProcessor {
         this.input.connect(this.output);
     }
 
-    private createEffect({ type, parameters }: EffectConfig): EffectNode {
-        switch (type) {
-            case 'reverb':
-                return new Tone.Reverb({
-                    decay: parameters.decay ?? 2,
-                    preDelay: parameters.preDelay ?? 0.02,
-                    wet: parameters.wetness ?? 0.3,
-                });
-            case 'eq':
-                return new Tone.EQ3({
-                    low: parameters.lowGain ?? 0,
-                    mid: parameters.midGain ?? 0,
-                    high: parameters.highGain ?? 0,
-                    lowFrequency: parameters.lowFreq ?? 200,
-                    highFrequency: parameters.highFreq ?? 4000,
-                });
-            case 'compressor':
-                return new Tone.Compressor({
-                    threshold: parameters.threshold ?? -18,
-                    ratio: parameters.ratio ?? 3,
-                    attack: parameters.attack ?? 0.003,
-                    release: parameters.release ?? 0.25,
-                    knee: parameters.knee ?? 12,
-                });
-            case 'delay':
-                return new Tone.FeedbackDelay({
-                    delayTime: parameters.time ?? 0.25,
-                    feedback: parameters.feedback ?? 0.25,
-                    wet: parameters.wetness ?? 0.25,
-                });
-            case 'chorus':
-                return new Tone.Chorus({
-                    frequency: parameters.frequency ?? 1.5,
-                    delayTime: parameters.delayTime ?? 3.5,
-                    depth: parameters.depth ?? 0.5,
-                    spread: parameters.spread ?? 180,
-                    type: 'sine',
-                    wet: parameters.wetness ?? 0.35,
-                }).start();
-            case 'phaser':
-                return new Tone.Phaser({
-                    frequency: parameters.frequency ?? 0.8,
-                    octaves: parameters.octaves ?? 3,
-                    stages: Math.round(parameters.stages ?? 6),
-                    Q: parameters.Q ?? 8,
-                    baseFrequency: parameters.baseFrequency ?? 350,
-                    wet: parameters.wetness ?? 0.5,
-                });
-            case 'distortion':
-                return new Tone.Distortion({
-                    distortion: parameters.drive ?? 0.3,
-                    oversample: oversampleType(parameters.oversample),
-                    wet: parameters.wetness ?? 0.5,
-                });
-            case 'filter':
-                return new Tone.Filter({
-                    frequency: parameters.frequency ?? 1000,
-                    Q: parameters.Q ?? 0.707,
-                    type: 'lowpass',
-                    rolloff: -12,
-                });
-            case 'limiter':
-                return new Tone.Limiter({ threshold: parameters.threshold ?? -3 });
-            case 'gate':
-                return new Tone.Gate({
-                    threshold: parameters.threshold ?? -45,
-                    smoothing: parameters.smoothing ?? 0.05,
-                });
-        }
-    }
-
-    private updateEffectParameters(node: EffectNode, { type, parameters }: EffectConfig) {
-        switch (type) {
-            case 'reverb':
-                if (node instanceof Tone.Reverb) {
-                    if (parameters.decay !== undefined && node.decay !== parameters.decay) {
-                        node.decay = Math.max(0.001, parameters.decay);
-                    }
-                    if (parameters.preDelay !== undefined && node.preDelay !== parameters.preDelay) {
-                        node.preDelay = Math.max(0, parameters.preDelay);
-                    }
-                    if (parameters.wetness !== undefined) node.wet.rampTo(parameters.wetness, PARAMETER_RAMP_TIME);
-                }
-                break;
-            case 'eq':
-                if (node instanceof Tone.EQ3) {
-                    if (parameters.lowGain !== undefined) node.low.rampTo(parameters.lowGain, PARAMETER_RAMP_TIME);
-                    if (parameters.midGain !== undefined) node.mid.rampTo(parameters.midGain, PARAMETER_RAMP_TIME);
-                    if (parameters.highGain !== undefined) node.high.rampTo(parameters.highGain, PARAMETER_RAMP_TIME);
-                    if (parameters.lowFreq !== undefined) node.lowFrequency.rampTo(parameters.lowFreq, PARAMETER_RAMP_TIME);
-                    if (parameters.highFreq !== undefined) node.highFrequency.rampTo(parameters.highFreq, PARAMETER_RAMP_TIME);
-                }
-                break;
-            case 'compressor':
-                if (node instanceof Tone.Compressor) {
-                    if (parameters.threshold !== undefined) node.threshold.rampTo(parameters.threshold, PARAMETER_RAMP_TIME);
-                    if (parameters.ratio !== undefined) node.ratio.rampTo(parameters.ratio, PARAMETER_RAMP_TIME);
-                    if (parameters.attack !== undefined) node.attack.rampTo(parameters.attack, PARAMETER_RAMP_TIME);
-                    if (parameters.release !== undefined) node.release.rampTo(parameters.release, PARAMETER_RAMP_TIME);
-                    if (parameters.knee !== undefined) node.knee.rampTo(parameters.knee, PARAMETER_RAMP_TIME);
-                }
-                break;
-            case 'delay':
-                if (node instanceof Tone.FeedbackDelay) {
-                    if (parameters.time !== undefined) node.delayTime.rampTo(parameters.time, PARAMETER_RAMP_TIME);
-                    if (parameters.feedback !== undefined) node.feedback.rampTo(parameters.feedback, PARAMETER_RAMP_TIME);
-                    if (parameters.wetness !== undefined) node.wet.rampTo(parameters.wetness, PARAMETER_RAMP_TIME);
-                }
-                break;
-            case 'chorus':
-                if (node instanceof Tone.Chorus) {
-                    if (parameters.frequency !== undefined) node.frequency.rampTo(parameters.frequency, PARAMETER_RAMP_TIME);
-                    if (parameters.delayTime !== undefined) node.delayTime = parameters.delayTime;
-                    if (parameters.depth !== undefined) node.depth = parameters.depth;
-                    if (parameters.spread !== undefined) node.spread = parameters.spread;
-                    if (parameters.wetness !== undefined) node.wet.rampTo(parameters.wetness, PARAMETER_RAMP_TIME);
-                }
-                break;
-            case 'phaser':
-                if (node instanceof Tone.Phaser) {
-                    if (parameters.frequency !== undefined) node.frequency.rampTo(parameters.frequency, PARAMETER_RAMP_TIME);
-                    if (parameters.octaves !== undefined) node.octaves = parameters.octaves;
-                    if (parameters.Q !== undefined) node.Q.rampTo(parameters.Q, PARAMETER_RAMP_TIME);
-                    if (parameters.baseFrequency !== undefined) node.baseFrequency = parameters.baseFrequency;
-                    if (parameters.wetness !== undefined) node.wet.rampTo(parameters.wetness, PARAMETER_RAMP_TIME);
-                }
-                break;
-            case 'distortion':
-                if (node instanceof Tone.Distortion) {
-                    if (parameters.drive !== undefined) node.distortion = parameters.drive;
-                    if (parameters.oversample !== undefined) node.oversample = oversampleType(parameters.oversample);
-                    if (parameters.wetness !== undefined) node.wet.rampTo(parameters.wetness, PARAMETER_RAMP_TIME);
-                }
-                break;
-            case 'filter':
-                if (node instanceof Tone.Filter) {
-                    if (parameters.frequency !== undefined) node.frequency.rampTo(parameters.frequency, PARAMETER_RAMP_TIME);
-                    if (parameters.Q !== undefined) node.Q.rampTo(parameters.Q, PARAMETER_RAMP_TIME);
-                }
-                break;
-            case 'limiter':
-                if (node instanceof Tone.Limiter && parameters.threshold !== undefined) {
-                    node.threshold.rampTo(parameters.threshold, PARAMETER_RAMP_TIME);
-                }
-                break;
-            case 'gate':
-                if (node instanceof Tone.Gate) {
-                    if (parameters.threshold !== undefined) node.threshold = parameters.threshold;
-                    if (parameters.smoothing !== undefined) node.smoothing = parameters.smoothing;
-                }
-                break;
-        }
-    }
-
     private removeEffect(effectId: string) {
         const entry = this.effects.get(effectId);
         if (!entry) return;
-        entry.node.disconnect();
-        entry.node.dispose();
+        entry.module.dispose();
         this.effects.delete(effectId);
+    }
+
+    private shouldRebuild(existing: EffectConfig, next: EffectConfig): boolean {
+        if (existing.type !== next.type) return true;
+        // 相位器级数变化会重建内部全通链，需重建模块
+        if (next.type === 'phaser') return existing.parameters.stages !== next.parameters.stages;
+        // EQ 仅频点数量变化（增删频点）需重建；类型切换在 update 里实时改 type
+        if (next.type === 'eq') {
+            return (existing.eqBands ?? []).length !== (next.eqBands ?? []).length;
+        }
+        return false;
     }
 
     updateEffectsChain(effectConfigs: EffectConfig[]) {
         const enabledEffects = effectConfigs
-            .filter(config => config.enabled && !config.bypass)
+            .filter((config) => config.enabled)
             .sort((a, b) => a.order - b.order);
-        const enabledIds = new Set(enabledEffects.map(config => config.id));
+        const enabledIds = new Set(enabledEffects.map((config) => config.id));
+
+        // 标记本次是否有模块被移除/重建，需要强制重连链
+        let chainDirty = false;
 
         for (const effectId of this.effects.keys()) {
-            if (!enabledIds.has(effectId)) this.removeEffect(effectId);
+            if (!enabledIds.has(effectId)) {
+                this.removeEffect(effectId);
+                chainDirty = true;
+            }
         }
 
         for (const config of enabledEffects) {
             const existing = this.effects.get(config.id);
-            const stagesChanged = config.type === 'phaser'
-                && existing?.config.parameters.stages !== config.parameters.stages;
-
-            if (existing && (existing.config.type !== config.type || stagesChanged)) {
+            if (existing && this.shouldRebuild(existing.config, config)) {
                 this.removeEffect(config.id);
+                chainDirty = true;
             }
 
             try {
                 if (!this.effects.has(config.id)) {
-                    this.effects.set(config.id, {
-                        node: this.createEffect(config),
-                        config,
-                    });
+                    this.effects.set(config.id, { module: createModule(config), config });
                 } else {
                     const entry = this.effects.get(config.id)!;
-                    this.updateEffectParameters(entry.node, config);
+                    entry.module.update(config);
                     entry.config = config;
                 }
             } catch (error) {
                 console.error(`无法创建或更新效果器 ${config.type}:`, error);
                 this.removeEffect(config.id);
+                chainDirty = true;
             }
         }
 
         const orderedEntries = enabledEffects
-            .map(config => this.effects.get(config.id))
+            .map((config) => this.effects.get(config.id))
             .filter((entry): entry is EffectEntry => Boolean(entry));
-        const nextChainKey = orderedEntries.map(entry => entry.config.id).join('|');
-        if (nextChainKey === this.chainKey) return;
+        const nextChainKey = orderedEntries.map((entry) => entry.config.id).join('|');
+        if (nextChainKey === this.chainKey && !chainDirty) return;
 
         this.input.disconnect();
-        for (const entry of this.effects.values()) entry.node.disconnect();
+        for (const entry of this.effects.values()) entry.module.output.disconnect();
 
         let currentNode: Tone.ToneAudioNode = this.input;
         for (const entry of orderedEntries) {
-            currentNode.connect(entry.node);
-            currentNode = entry.node;
+            currentNode.connect(entry.module.input);
+            currentNode = entry.module.output;
         }
         currentNode.connect(this.output);
         this.chainKey = nextChainKey;
     }
 
     async ready(): Promise<void> {
-        await Promise.all(
-            [...this.effects.values()]
-                .map(entry => entry.node)
-                .filter((node): node is Tone.Reverb => node instanceof Tone.Reverb)
-                .map(reverb => reverb.ready)
-        );
+        // 卷积混响用同步 AudioBuffer 设置，无需异步等待
     }
 
     connect(destination: Tone.ToneAudioNode) {

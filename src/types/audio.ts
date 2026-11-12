@@ -6,6 +6,30 @@ export interface AudioFile {
     size: number;
 }
 
+export type EqBandType =
+    | 'lowpass'
+    | 'highpass'
+    | 'bandpass'
+    | 'notch'
+    | 'peaking'
+    | 'lowshelf'
+    | 'highshelf';
+
+export interface EqBandData {
+    id: string;
+    type: EqBandType;
+    freq: number;
+    /** dB，仅对 peaking/lowshelf/highshelf 生效 */
+    gain: number;
+    q: number;
+}
+
+/** 失真波形整形曲线控制点：x 为输入(-1..1)，y 为输出(-1..1) */
+export interface ShaperPoint {
+    x: number;
+    y: number;
+}
+
 export interface EffectConfig {
     id: string;
     name: string;
@@ -13,8 +37,10 @@ export interface EffectConfig {
     enabled: boolean;
     parameters: Record<string, number>;
     order: number;
-    instanceId?: string; // 用于区分同类型的多个实例
-    bypass?: boolean; // 是否绕过效果器
+    /** 仅 eq 类型使用：动态频段列表 */
+    eqBands?: EqBandData[];
+    /** 仅 distortion 类型使用：波形整形曲线控制点 */
+    shaperPoints?: ShaperPoint[];
 }
 
 export type EffectType =

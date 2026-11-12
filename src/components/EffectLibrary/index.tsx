@@ -103,8 +103,13 @@ export const EffectLibrary: React.FC<EffectLibraryProps> = ({ onAddEffect }) => 
                                     <button
                                         key={effect.type}
                                         className="effect-button"
+                                        draggable
+                                        onDragStart={(e) => {
+                                            e.dataTransfer.setData('application/x-effect-type', effect.type);
+                                            e.dataTransfer.effectAllowed = 'copy';
+                                        }}
                                         onClick={() => onAddEffect(effect.type)}
-                                        title={effect.description}
+                                        title={`${effect.description}（点击或拖拽到效果器链）`}
                                     >
                                         <span className="effect-icon">{effect.icon}</span>
                                         <span className="effect-name">{effect.name}</span>

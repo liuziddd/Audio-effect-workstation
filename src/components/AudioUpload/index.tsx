@@ -88,6 +88,7 @@ export const AudioUpload: React.FC<AudioUploadProps> = ({
 
     const handleDrop = useCallback((e: React.DragEvent) => {
         e.preventDefault();
+        e.stopPropagation();
         setIsDragOver(false);
 
         if (disabled || isLoading) return;
