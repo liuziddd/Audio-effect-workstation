@@ -1,0 +1,223 @@
+.audio-inspector {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 4px 2px;
+    font-size: 0.86em;
+}
+
+.inspector-dropzone {
+    display: block;
+    padding: 14px;
+    border: 1px dashed rgba(0, 212, 255, 0.4);
+    border-radius: 10px;
+    background: rgba(0, 212, 255, 0.04);
+    color: #e2e8f0;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.inspector-dropzone:hover {
+    border-color: #00d4ff;
+    background: rgba(0, 212, 255, 0.1);
+}
+
+.inspector-dropzone input {
+    display: none;
+}
+
+.inspector-hint {
+    margin: 0;
+    font-size: 0.82em;
+    color: #64748b;
+    line-height: 1.5;
+}
+
+.inspector-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 12px;
+}
+
+.inspector-card h4 {
+    margin: 0 0 10px;
+    font-size: 0.9em;
+    font-weight: 600;
+    color: #38bdf8;
+}
+
+.spec-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85em;
+}
+
+.spec-table td {
+    padding: 6px 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.spec-table tr:last-child td {
+    border-bottom: none;
+}
+
+.spec-table td:first-child {
+    color: #94a3b8;
+    width: 92px;
+    white-space: nowrap;
+}
+
+.spec-table td:last-child {
+    font-family: 'Cascadia Code', Consolas, monospace;
+    color: #e2e8f0;
+    word-break: break-all;
+}
+
+.inspector-message {
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 0.84em;
+    margin: 0;
+    line-height: 1.5;
+}
+
+.inspector-message.ok {
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.5);
+    color: #34d399;
+}
+
+.inspector-message.bad {
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.5);
+    color: #f87171;
+}
+
+.inspector-message.info {
+    background: rgba(56, 189, 248, 0.12);
+    border: 1px solid rgba(56, 189, 248, 0.5);
+    color: #38bdf8;
+}
+
+.audio-inspector audio {
+    width: 100%;
+    margin-top: 8px;
+    height: 34px;
+    border-radius: 8px;
+    color-scheme: dark;
+    filter: invert(0.9) hue-rotate(180deg);
+}
+
+.waveform-canvas,
+.spectrum-canvas {
+    display: block;
+    width: 100%;
+    height: 120px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.25);
+}
+
+.score-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.score-badge {
+    flex-shrink: 0;
+    width: 52px;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5em;
+    font-weight: 700;
+    border: 2px solid;
+    border-radius: 12px;
+    font-family: 'Cascadia Code', Consolas, monospace;
+}
+
+.score-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+.grade-text {
+    font-size: 1.05em;
+    font-weight: 600;
+}
+
+.eval-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.eval-item {
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.02);
+    border-left: 3px solid rgba(255, 255, 255, 0.12);
+}
+
+.eval-head {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 2px;
+}
+
+.eval-label {
+    font-size: 0.88em;
+    font-weight: 600;
+    color: #e2e8f0;
+}
+
+.eval-value {
+    font-family: 'Cascadia Code', Consolas, monospace;
+    font-size: 0.82em;
+    color: #94a3b8;
+}
+
+.eval-grade {
+    margin-left: auto;
+    font-size: 0.8em;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.format-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+    gap: 6px;
+}
+
+.format-item {
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 0.8em;
+    text-align: center;
+}
+
+.format-item.ok {
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid #10b981;
+    color: #34d399;
+}
+
+.format-item.warn {
+    background: rgba(245, 158, 11, 0.15);
+    border: 1px solid #f59e0b;
+    color: #fbbf24;
+}
+
+.format-item.bad {
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid #ef4444;
+    color: #f87171;
+}

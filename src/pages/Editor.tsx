@@ -1,25 +1,43 @@
-import { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as Tone from 'tone';
+import { Search, FileAudio, FolderOpen, X, SlidersHorizontal } from 'lucide-react';
 import { useAudioWithEffects } from '../hooks/useAudioWithEffects';
 import { AudioUpload } from '../components/AudioUpload';
 import { EffectLibrary } from '../components/EffectLibrary';
 import { EffectChain } from '../components/EffectChain';
 import { SimpleAudioPlayer } from '../components/SimpleAudioPlayer';
 import { AudioExport } from '../components/AudioExport';
+import { FileBrowser } from '../components/FileBrowser';
+import { AudioInspector } from '../components/AudioInspector';
 import { AudioFile } from '../types/audio';
 
 const StemSeparator = lazy(() => import('../components/StemSeparator'));
+
+type ToolId = 'inspector' | 'separator' | null;
+
+// 效果器库收纳条宽度（收纳态占位）+ 展开面板宽度
+const LIBRARY_BAR_WIDTH = 40;
+const LIBRARY_PANEL_WIDTH = 280;
+
+// 侧边栏配色（取自参考壁纸）：绿色渐变（图1）/ 蓝青渐变（图2）
+const GREEN_GRADIENT =
+    'linear-gradient(180deg, rgba(13,30,60,0.97) 0%, rgba(15,90,107,0.94) 52%, rgba(23,160,94,0.9) 100%)';
+const BLUE_GRADIENT =
+    'linear-gradient(180deg, rgba(26,58,168,0.95) 0%, rgba(24,115,216,0.92) 45%, rgba(42,168,184,0.88) 100%)';
 
 export const Editor = () => {
     const [audioFile, setAudioFile] = useState<AudioFile | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [hasAudioBuffer, setHasAudioBuffer] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
-    const [showStemSeparator, setShowStemSeparator] = useState(false);
-    const [isDraggingAudio, setIsDraggingAudio] = useState(false);
-    const dragDepthRef = useRef(0);
+    const [activeTool, setActiveTool] = useState<ToolId>(null);
+    const [libraryOpen, setLibraryOpen] = useState(false);
+    // 左侧固定侧边栏默认宽度（px）。要改默认宽度，改这里的 240 即可。
+    const [leftWidth, setLeftWidth] = useState(240);
+
+    // 侧边栏窄于该阈值时，文字折叠消失、只保留图标
+    const collapsed = leftWidth < 140;
 
     const {
         isPlaying,
@@ -48,30 +66,13 @@ export const Editor = () => {
     } = useAudioWithEffects();
 
     const playerControls = {
-        isPlaying,
-        isLoaded,
-        currentTime,
-        duration,
-        volume,
-        play,
-        pause,
-        stop,
-        beginSeek,
-        previewSeek,
-        seek,
-        setVolume,
-        exportAudio,
+        isPlaying, isLoaded, currentTime, duration, volume,
+        play, pause, stop, beginSeek, previewSeek, seek, setVolume, exportAudio,
     };
 
     const loadAudioFile = (file: File) => {
         if (!file) return;
-        setAudioFile({
-            file,
-            name: file.name,
-            size: file.size,
-            url: URL.createObjectURL(file),
-            duration: 0,
-        });
+        setAudioFile({ file, name: file.name, size: file.size, url: URL.createObjectURL(file), duration: 0 });
         setIsLoading(true);
         setError(null);
         setHasAudioBuffer(false);
@@ -90,40 +91,6 @@ export const Editor = () => {
         loadAudioFile(file);
     };
 
-    const isAudioFile = (file: File) =>
-        file.type.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|aac|flac|webm|mp4)$/i.test(file.name);
-
-    const hasAudioFiles = (e: React.DragEvent) => Array.from(e.dataTransfer.types).includes('Files');
-
-    const handleDragEnter = (e: React.DragEvent) => {
-        if (!hasAudioFiles(e)) return;
-        e.preventDefault();
-        dragDepthRef.current += 1;
-        setIsDraggingAudio(true);
-    };
-
-    const handleDragOver = (e: React.DragEvent) => {
-        if (hasAudioFiles(e)) e.preventDefault();
-    };
-
-    const handleDragLeave = (e: React.DragEvent) => {
-        if (!hasAudioFiles(e)) return;
-        dragDepthRef.current -= 1;
-        if (dragDepthRef.current <= 0) {
-            dragDepthRef.current = 0;
-            setIsDraggingAudio(false);
-        }
-    };
-
-    const handleDrop = (e: React.DragEvent) => {
-        if (!hasAudioFiles(e)) return;
-        e.preventDefault();
-        dragDepthRef.current = 0;
-        setIsDraggingAudio(false);
-        const file = Array.from(e.dataTransfer.files).find(isAudioFile);
-        if (file) replaceAudio(file);
-    };
-
     const handleClearAudio = () => {
         clearAudio();
         clearAudioFile();
@@ -138,7 +105,6 @@ export const Editor = () => {
                     const buffer = await Tone.ToneAudioBuffer.fromUrl(audioFile.url);
                     const audioBuffer = buffer.get();
                     if (!audioBuffer) throw new Error('无法获取 AudioBuffer');
-
                     setAudioFile((prev) => (prev ? { ...prev, duration: audioBuffer.duration } : null));
                     loadAudio(audioBuffer, audioBuffer.duration);
                     setHasAudioBuffer(true);
@@ -153,25 +119,34 @@ export const Editor = () => {
         }
     }, [audioFile, hasAudioBuffer, loadAudio]);
 
+    const toggleTool = (id: Exclude<ToolId, null>) => {
+        setActiveTool((prev) => (prev === id ? null : id));
+    };
+
+    const startResize = (e: React.MouseEvent) => {
+        e.preventDefault();
+        const startX = e.clientX;
+        const startWidth = leftWidth;
+        const onMove = (ev: MouseEvent) => {
+            // 左侧栏可调宽度范围：78 ~ 280px
+            setLeftWidth(Math.min(280, Math.max(78, startWidth + (ev.clientX - startX))));
+        };
+        const onUp = () => {
+            window.removeEventListener('mousemove', onMove);
+            window.removeEventListener('mouseup', onUp);
+        };
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+    };
+
+    const toolTitle = activeTool === 'inspector' ? '🔍 音频检测工具' : '🎛️ AI 音轨分离';
+
     return (
         <div
             className="min-h-screen bg-[#0a0a0a] text-white font-sans overflow-x-hidden"
-            onDragEnter={handleDragEnter}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => e.preventDefault()}
         >
-            {/* 拖拽音频文件时的全屏提示遮罩 */}
-            {isDraggingAudio && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm pointer-events-none">
-                    <div className="text-center">
-                        <div className="text-6xl mb-4">🎵</div>
-                        <p className="text-2xl font-bold text-white">松开以加载音频</p>
-                        <p className="text-neon-blue mt-2">支持 MP3 / WAV / OGG / M4A / AAC / FLAC / WebM</p>
-                    </div>
-                </div>
-            )}
-
             {/* 背景装饰 */}
             <div className="fixed inset-0 pointer-events-none overflow-hidden">
                 <div
@@ -194,132 +169,167 @@ export const Editor = () => {
                 />
             </div>
 
-            {/* 固定侧边栏 - 效果器库（右侧） */}
+            {/* 左侧固定侧边栏（非收纳、可调宽），无圆角，上中下三段 */}
             <div
-                className={`fixed right-0 top-0 h-full z-20 transition-all duration-300 ${sidebarCollapsed ? 'w-16' : 'w-80'}`}
-                onMouseEnter={() => setSidebarCollapsed(false)}
-                onMouseLeave={() => setSidebarCollapsed(true)}
+                className="fixed left-0 top-0 h-full z-40 border-r border-white/10 backdrop-blur-md flex flex-col overflow-hidden"
+                style={{ width: leftWidth, background: GREEN_GRADIENT }}
             >
-                {sidebarCollapsed && (
-                    <div className="w-16 h-full bg-gradient-to-b from-gray-900 to-gray-800 border-l border-gray-700 flex flex-col items-center justify-center gap-3 py-4">
-                        <motion.div
-                            className="text-neon-blue text-xl cursor-pointer"
-                            animate={{ x: [0, -3, 0] }}
-                            transition={{ duration: 2, repeat: Infinity }}
-                        >
-                            🎛️
-                        </motion.div>
-                        <div className="text-neon-blue text-xs font-medium">
-                            <div className="flex flex-col items-center gap-1">
-                                <span>效</span>
-                                <span>果</span>
-                                <span>器</span>
-                                <span>库</span>
-                            </div>
-                        </div>
-                    </div>
-                )}
+                {/* 上段：Logo 占位 + 标题（标题在侧边栏内，窄时折叠消失） */}
+                <div className="h-[68px] flex-shrink-0 border-b border-white/10 flex items-center px-4">
+                    <div className="w-11 h-11 flex-shrink-0" />
+                    <span
+                        className={`ml-3 text-sm font-semibold tracking-wide whitespace-nowrap overflow-hidden text-white transition-all duration-200 ${
+                            collapsed ? 'max-w-0 opacity-0' : 'max-w-[160px] opacity-100'
+                        }`}
+                    >
+                        音频效果工作站
+                    </span>
+                </div>
 
-                <AnimatePresence>
-                    {!sidebarCollapsed && (
-                        <motion.div
-                            initial={{ x: 300, opacity: 0 }}
-                            animate={{ x: 0, opacity: 1 }}
-                            exit={{ x: 300, opacity: 0 }}
-                            transition={{ duration: 0.3 }}
-                            className="w-80 h-full bg-gradient-to-b from-gray-900 to-gray-800 border-l border-gray-700 shadow-2xl overflow-y-auto"
+                {/* 中段：本地文件浏览器（类 FL 资源管理器） */}
+                <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                    <div className="px-3 pt-3 pb-2 flex items-center gap-1.5 flex-shrink-0">
+                        <FolderOpen className="w-3.5 h-3.5 text-white/60 flex-shrink-0" />
+                        <span
+                            className={`text-xs font-semibold text-white/60 uppercase tracking-wider whitespace-nowrap overflow-hidden transition-all duration-200 ${
+                                collapsed ? 'max-w-0 opacity-0' : 'opacity-100'
+                            }`}
                         >
-                            <div className="p-4">
-                                <div className="flex items-center justify-between mb-4">
-                                    <h3 className="text-lg font-bold bg-gradient-to-r from-neon-blue to-neon-purple bg-clip-text text-transparent">
-                                        🎛️ 效果器库
-                                    </h3>
-                                    <motion.button
-                                        onClick={() => setSidebarCollapsed(true)}
-                                        className="text-gray-400 hover:text-white p-1"
-                                        whileHover={{ scale: 1.1 }}
-                                        whileTap={{ scale: 0.9 }}
-                                    >
-                                        ▶
-                                    </motion.button>
+                            本地文件
+                        </span>
+                    </div>
+                    <div className="flex-1 min-h-0 flex flex-col px-3 pb-3">
+                        <FileBrowser onLoadFile={replaceAudio} />
+                    </div>
+                </div>
+
+                {/* 下段：工具按钮（音频检测 / AI 音轨分离） */}
+                <div className="p-3 border-t border-white/10 flex flex-col gap-2 flex-shrink-0">
+                    <button
+                        onClick={() => toggleTool('inspector')}
+                        className={`inline-flex items-center justify-center rounded-xl text-white font-medium text-sm transition-all duration-200 px-2 py-2.5 ${
+                            collapsed ? 'gap-0' : 'gap-2'
+                        } ${
+                            activeTool === 'inspector'
+                                ? 'bg-gradient-to-r from-blue-500 to-purple-500 shadow-lg'
+                                : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500'
+                        }`}
+                    >
+                        <Search className="w-4 h-4 flex-shrink-0" />
+                        <span className={`whitespace-nowrap overflow-hidden transition-all duration-200 ${collapsed ? 'max-w-0 opacity-0' : 'max-w-full opacity-100'}`}>
+                            音频检测
+                        </span>
+                    </button>
+                    <button
+                        onClick={() => toggleTool('separator')}
+                        className={`inline-flex items-center justify-center rounded-xl text-white font-medium text-sm transition-all duration-200 px-2 py-2.5 ${
+                            collapsed ? 'gap-0' : 'gap-2'
+                        } ${
+                            activeTool === 'separator'
+                                ? 'bg-gradient-to-r from-pink-500 to-rose-500 shadow-lg'
+                                : 'bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500'
+                        }`}
+                    >
+                        <FileAudio className="w-4 h-4 flex-shrink-0" />
+                        <span className={`whitespace-nowrap overflow-hidden transition-all duration-200 ${collapsed ? 'max-w-0 opacity-0' : 'max-w-full opacity-100'}`}>
+                            AI 音轨分离
+                        </span>
+                    </button>
+                </div>
+
+                {/* 拖拽调宽手柄 */}
+                <div
+                    className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-neon-blue/50 transition-colors"
+                    onMouseDown={startResize}
+                />
+            </div>
+
+            {/* 效果器库收纳栏：透明玻璃竖条在最右，hover 时面板从左侧栏旁抽出 */}
+            <div
+                className="fixed top-0 h-full z-40 flex items-stretch"
+                style={{ left: leftWidth }}
+                onMouseEnter={() => setLibraryOpen(true)}
+                onMouseLeave={() => setLibraryOpen(false)}
+            >
+                <AnimatePresence>
+                    {libraryOpen && (
+                        <motion.div
+                            className="h-full overflow-hidden border-r border-white/10"
+                            style={{ background: BLUE_GRADIENT, backdropFilter: 'blur(12px)' }}
+                            initial={{ width: 0, opacity: 0 }}
+                            animate={{ width: LIBRARY_PANEL_WIDTH, opacity: 1 }}
+                            exit={{ width: 0, opacity: 0 }}
+                            transition={{ type: 'spring', stiffness: 300, damping: 34 }}
+                        >
+                            <div style={{ width: LIBRARY_PANEL_WIDTH }} className="h-full flex flex-col">
+                                <div className="px-4 py-3 border-b border-white/10">
+                                    <h3 className="text-sm font-semibold text-white">🎛️ 效果器库</h3>
                                 </div>
-                                <EffectLibrary onAddEffect={addEffect} />
+                                <div className="flex-1 overflow-y-auto p-3">
+                                    <EffectLibrary onAddEffect={addEffect} />
+                                </div>
                             </div>
                         </motion.div>
                     )}
                 </AnimatePresence>
+
+                {/* 透明玻璃竖条（触发区，恒显，位于面板最右） */}
+                <div
+                    className="h-full shrink-0 flex flex-col items-center justify-center gap-3 cursor-pointer select-none"
+                    style={{
+                        width: LIBRARY_BAR_WIDTH,
+                        background: 'rgba(255,255,255,0.05)',
+                        backdropFilter: 'blur(14px)',
+                        borderLeft: '1px solid rgba(255,255,255,0.12)',
+                        borderRight: '1px solid rgba(255,255,255,0.06)',
+                    }}
+                >
+                    <SlidersHorizontal className="w-4 h-4 text-white/80" />
+                    <span className="text-white/80 text-xs font-medium tracking-widest" style={{ writingMode: 'vertical-rl' }}>
+                        效果器库
+                    </span>
+                </div>
             </div>
 
-            {/* 主容器 */}
-            <div className={`relative z-10 transition-all duration-300 ${sidebarCollapsed ? 'mr-16' : 'mr-80'}`}>
-                <div className="px-6 py-8 w-full">
-                    <motion.header
-                        className="text-center mb-8"
-                        initial={{ opacity: 0, y: -20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.6 }}
+            {/* 工具面板（紧贴左侧栏弹出，overlay 不挤压中间） */}
+            <AnimatePresence>
+                {activeTool && (
+                    <motion.div
+                        className="fixed top-0 h-full z-50 border-r border-white/10 backdrop-blur-md shadow-2xl overflow-hidden"
+                        style={{ left: leftWidth, width: 400, background: GREEN_GRADIENT }}
+                        initial={{ x: -400, opacity: 0 }}
+                        animate={{ x: 0, opacity: 1 }}
+                        exit={{ x: -400, opacity: 0 }}
+                        transition={{ type: 'spring', stiffness: 300, damping: 32 }}
                     >
-                        <h1 className="text-4xl md:text-6xl font-bold mb-4 flex items-center justify-center gap-3">
-                            <span className="text-4xl md:text-6xl">🎛️</span>
-                            <span className="bg-gradient-to-r from-neon-blue via-neon-purple to-neon-green bg-clip-text text-transparent">
-                                音频效果工作站
-                            </span>
-                        </h1>
-                        <p className="text-gray-400 text-lg max-w-2xl mx-auto mb-2">
-                            专业的 Web 音频处理平台，支持拖拽排序的实时效果器链和高质量音频处理
-                        </p>
-                        <p className="text-gray-500 text-sm max-w-xl mx-auto mb-6">
-                            💡 悬停右侧边栏查看效果器库
-                        </p>
-
-                        <motion.div
-                            className="flex justify-center gap-4 mb-6 px-4"
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.6, delay: 0.3 }}
-                        >
-                            <motion.a
-                                href="/audio-inspector.html"
-                                target="_blank"
-                                className="inline-flex items-center justify-center gap-2 px-4 sm:px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-medium rounded-xl shadow-lg transition-all duration-300 transform hover:-translate-y-1 text-sm sm:text-base"
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
+                        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+                            <h3 className="text-sm font-semibold text-white">{toolTitle}</h3>
+                            <button
+                                onClick={() => setActiveTool(null)}
+                                className="text-white/70 hover:text-white p-1"
                             >
-                                <span className="text-lg">🔍</span>
-                                <span className="whitespace-nowrap">音频检测工具</span>
-                            </motion.a>
-                            <motion.button
-                                onClick={() => setShowStemSeparator((v) => !v)}
-                                className={`inline-flex items-center justify-center gap-2 px-4 sm:px-6 py-3 font-medium rounded-xl shadow-lg transition-all duration-300 transform hover:-translate-y-1 text-sm sm:text-base ${
-                                    showStemSeparator
-                                        ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500'
-                                        : 'bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500'
-                                } text-white`}
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                            >
-                                <span className="text-lg">🎛️</span>
-                                <span className="whitespace-nowrap">AI 音轨分离</span>
-                            </motion.button>
-                        </motion.div>
-
-                        <AnimatePresence>
-                            {showStemSeparator && (
-                                <motion.div
-                                    initial={{ opacity: 0, height: 0 }}
-                                    animate={{ opacity: 1, height: 'auto' }}
-                                    exit={{ opacity: 0, height: 0 }}
-                                    transition={{ duration: 0.3 }}
-                                    className="mb-6 overflow-hidden"
-                                >
-                                    <Suspense fallback={<div className="text-center p-8 text-gray-400">正在加载分离引擎…</div>}>
-                                        <StemSeparator />
-                                    </Suspense>
-                                </motion.div>
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+                        <div className="p-4 overflow-y-auto" style={{ height: 'calc(100% - 49px)' }}>
+                            {activeTool === 'inspector' ? (
+                                <AudioInspector />
+                            ) : (
+                                <Suspense fallback={<div className="text-center p-8 text-white/60">正在加载分离引擎…</div>}>
+                                    <StemSeparator />
+                                </Suspense>
                             )}
-                        </AnimatePresence>
-                    </motion.header>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
+            {/* 中间主工作区 */}
+            <div
+                className="relative z-10 min-h-screen transition-[margin-left] duration-200"
+                style={{ marginLeft: leftWidth + LIBRARY_BAR_WIDTH }}
+            >
+                <div className="px-6 py-8 w-full">
                     {error && (
                         <motion.div
                             className="mb-6 p-4 bg-red-900 bg-opacity-20 border border-red-500 rounded-lg text-red-300"
@@ -357,12 +367,15 @@ export const Editor = () => {
                                     animate={{ opacity: 1, x: 0 }}
                                     transition={{ duration: 0.6, delay: 0.3 }}
                                 >
-                                    <div className="bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-700 rounded-xl p-6 shadow-2xl h-fit">
+                                    <div
+                                        className="border border-white/10 rounded-xl p-6 shadow-2xl h-fit"
+                                        style={{ background: 'linear-gradient(160deg, rgba(18,34,72,0.9) 0%, rgba(18,88,110,0.84) 100%)' }}
+                                    >
                                         <div className="flex items-center justify-between mb-4">
-                                            <h3 className="text-lg font-bold bg-gradient-to-r from-neon-blue to-neon-purple bg-clip-text text-transparent">
+                                            <h3 className="text-lg font-bold text-white">
                                                 🔗 效果器链
                                             </h3>
-                                            <div className="text-sm text-gray-400">{effects.length} 个效果器</div>
+                                            <div className="text-sm text-white/60">{effects.length} 个效果器</div>
                                         </div>
                                         <EffectChain
                                             effects={effects}
@@ -387,16 +400,7 @@ export const Editor = () => {
                                         audioFile={audioFile}
                                         controls={playerControls}
                                         onClearAudio={handleClearAudio}
-                                        onSelectNewFile={() => {
-                                            const input = document.createElement('input');
-                                            input.type = 'file';
-                                            input.accept = 'audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/mp4,audio/aac,audio/webm,audio/flac,.mp3,.wav,.ogg,.m4a,.aac,.webm,.flac';
-                                            input.onchange = (e) => {
-                                                const file = (e.target as HTMLInputElement).files?.[0];
-                                                if (file) replaceAudio(file);
-                                            };
-                                            input.click();
-                                        }}
+                                        onReplaceFile={replaceAudio}
                                     />
 
                                     {hasAudioBuffer && (
@@ -419,9 +423,7 @@ export const Editor = () => {
                         animate={{ opacity: 1 }}
                         transition={{ delay: 1 }}
                     >
-                        <p className="text-gray-500 text-sm">
-                            🎵 专业音频处理工作站 | 基于 Tone.js 构建
-                        </p>
+                        <p className="text-gray-500 text-sm">🎵 专业音频处理工作站 | 基于 Tone.js 构建</p>
                     </motion.footer>
                 </div>
             </div>

@@ -6,10 +6,43 @@ interface HomeProps {
     onStart: (origin: { x: number; y: number }) => void;
 }
 
-/** 联系方式（微信为占位，需替换为真实微信号） */
+/** 联系方式 */
 const CONTACT = {
     github: 'https://github.com/liuziddd',
-    wechat: '微信：待填写微信号',
+    wechat: 'lyx0504210019',
+};
+
+/** 微信按钮：点击复制微信号 */
+const WeChatButton = () => {
+    const [copied, setCopied] = useState(false);
+
+    const copyWechat = async () => {
+        try {
+            await navigator.clipboard.writeText(CONTACT.wechat);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch {
+            /* 剪贴板不可用时忽略 */
+        }
+    };
+
+    return (
+        <button
+            onClick={copyWechat}
+            title={copied ? '已复制' : `微信号：${CONTACT.wechat}（点击复制）`}
+            className="group relative flex items-center justify-center w-10 h-10 rounded-full border border-white/15 bg-white/5 backdrop-blur-md hover:bg-neon-green/20 hover:border-neon-green transition-all duration-300"
+        >
+            <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current text-white group-hover:text-neon-green transition-colors">
+                <path d="M8.69 4C4.99 4 2 6.58 2 9.76c0 1.83 1 3.45 2.56 4.5l-.64 1.92 2.22-1.11c.5.14 1.02.22 1.55.22.2 0 .4-.01.6-.03-.14-.42-.21-.86-.21-1.32 0-3.18 3.02-5.76 6.75-5.76.25 0 .49.01.73.03C15.06 5.61 12.14 4 8.69 4zM6.6 7.1c.42 0 .76.34.76.76s-.34.76-.76.76-.76-.34-.76-.76.34-.76.76-.76zm4.18 0c.42 0 .76.34.76.76s-.34.76-.76.76-.76-.34-.76-.76.34-.76.76-.76z" />
+                <path d="M22 14.24c0-2.66-2.6-4.82-5.81-4.82s-5.81 2.16-5.81 4.82 2.6 4.82 5.81 4.82c.5 0 .99-.06 1.45-.17l1.95.98-.56-1.68c1.55-.99 2.97-2.35 2.97-3.95zm-7.61-.74c.34 0 .61.27.61.61s-.27.61-.61.61-.61-.27-.61-.61.27-.61.61-.61zm3.59 0c.34 0 .61.27.61.61s-.27.61-.61.61-.61-.27-.61-.61.27-.61.61-.61z" />
+            </svg>
+            {copied && (
+                <span className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2 py-1 text-xs bg-neon-green text-black rounded whitespace-nowrap">
+                    已复制
+                </span>
+            )}
+        </button>
+    );
 };
 
 /* ===== 极光背景：三团大模糊渐变光斑缓慢漂移 ===== */
@@ -120,17 +153,7 @@ export const Home = ({ onStart }: HomeProps) => (
                 transition={{ duration: 0.6, delay: 0.2 }}
             >
                 {/* 微信 */}
-                <a
-                    href="#"
-                    onClick={(e) => e.preventDefault()}
-                    title={CONTACT.wechat}
-                    className="group flex items-center justify-center w-10 h-10 rounded-full border border-white/15 bg-white/5 backdrop-blur-md hover:bg-neon-green/20 hover:border-neon-green transition-all duration-300"
-                >
-                    <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current text-white group-hover:text-neon-green transition-colors">
-                        <path d="M8.69 4C4.99 4 2 6.58 2 9.76c0 1.83 1 3.45 2.56 4.5l-.64 1.92 2.22-1.11c.5.14 1.02.22 1.55.22.2 0 .4-.01.6-.03-.14-.42-.21-.86-.21-1.32 0-3.18 3.02-5.76 6.75-5.76.25 0 .49.01.73.03C15.06 5.61 12.14 4 8.69 4zM6.6 7.1c.42 0 .76.34.76.76s-.34.76-.76.76-.76-.34-.76-.76.34-.76.76-.76zm4.18 0c.42 0 .76.34.76.76s-.34.76-.76.76-.76-.34-.76-.76.34-.76.76-.76z" />
-                        <path d="M22 14.24c0-2.66-2.6-4.82-5.81-4.82s-5.81 2.16-5.81 4.82 2.6 4.82 5.81 4.82c.5 0 .99-.06 1.45-.17l1.95.98-.56-1.68c1.55-.99 2.97-2.35 2.97-3.95zm-7.61-.74c.34 0 .61.27.61.61s-.27.61-.61.61-.61-.27-.61-.61.27-.61.61-.61zm3.59 0c.34 0 .61.27.61.61s-.27.61-.61.61-.61-.27-.61-.61.27-.61.61-.61z" />
-                    </svg>
-                </a>
+                <WeChatButton />
                 {/* GitHub */}
                 <a
                     href={CONTACT.github}

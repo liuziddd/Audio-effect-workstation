@@ -209,6 +209,7 @@ export const useAudioWithEffects = (): UseAudioWithEffectsReturn => {
             playerRef.current = null;
         }
 
+        setEffects([]);
         audioBufferRef.current = null;
         isLoadedRef.current = false;
         isPlayingRef.current = false;

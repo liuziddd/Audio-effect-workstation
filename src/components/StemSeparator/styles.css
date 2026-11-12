@@ -113,14 +113,21 @@
     flex: 1;
     height: 8px;
     appearance: none;
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 4px;
 }
 
 .stem-progress-row progress::-webkit-progress-bar {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.5);
     border-radius: 4px;
 }
 
 .stem-progress-row progress::-webkit-progress-value {
+    background: linear-gradient(to right, #4facfe, #a855f7);
+    border-radius: 4px;
+}
+
+.stem-progress-row progress::-moz-progress-bar {
     background: linear-gradient(to right, #4facfe, #a855f7);
     border-radius: 4px;
 }
@@ -171,7 +178,10 @@
 
 .stem-track audio {
     width: 100%;
-    height: 36px;
+    height: 40px;
+    border-radius: 8px;
+    color-scheme: dark;
+    filter: invert(0.9) hue-rotate(180deg);
 }
 
 .stem-download {

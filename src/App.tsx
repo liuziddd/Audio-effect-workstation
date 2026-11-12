@@ -62,7 +62,7 @@ function App() {
                 />
             </motion.div>
 
-            {/* 全局固定 Logo（始终在遮罩上方，提供视觉固定） */}
+            {/* 全局固定 Logo（始终在遮罩上方，提供视觉固定；点击返回首页） */}
             <div className="fixed left-4 top-4 z-[110]">
                 <MorphLogo onClick={togglePage} active={phase !== 'idle'} />
             </div>

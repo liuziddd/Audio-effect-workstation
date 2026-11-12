@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { AudioFile } from '../../types/audio';
 import './styles.css';
@@ -23,7 +23,7 @@ interface SimpleAudioPlayerProps {
     controls?: AudioControls;
     className?: string;
     onClearAudio?: () => void;
-    onSelectNewFile?: () => void;
+    onReplaceFile?: (file: File) => void;
 }
 
 const formatTime = (seconds: number): string => {
@@ -33,15 +33,20 @@ const formatTime = (seconds: number): string => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
 };
 
+const isAudioFile = (file: File) =>
+    file.type.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|aac|flac|webm|mp4)$/i.test(file.name);
+
 export const SimpleAudioPlayer: React.FC<SimpleAudioPlayerProps> = ({
     audioFile,
     controls,
     className = '',
     onClearAudio,
-    onSelectNewFile
+    onReplaceFile,
 }) => {
     const isSeekingRef = React.useRef(false);
     const seekTimeRef = React.useRef(0);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [isDragOver, setIsDragOver] = useState(false);
 
     const finishSeek = (event: React.PointerEvent<HTMLInputElement>) => {
         if (!controls || !isSeekingRef.current) return;
@@ -51,6 +56,22 @@ export const SimpleAudioPlayer: React.FC<SimpleAudioPlayerProps> = ({
         if (event.currentTarget.hasPointerCapture(event.pointerId)) {
             event.currentTarget.releasePointerCapture(event.pointerId);
         }
+    };
+
+    const pickFile = () => fileInputRef.current?.click();
+
+    const handleFileInput = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) onReplaceFile?.(file);
+        event.target.value = '';
+    };
+
+    const handleDrop = (event: React.DragEvent) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setIsDragOver(false);
+        const file = Array.from(event.dataTransfer.files).find(isAudioFile);
+        if (file) onReplaceFile?.(file);
     };
 
     if (!audioFile) {
@@ -70,7 +91,6 @@ export const SimpleAudioPlayer: React.FC<SimpleAudioPlayerProps> = ({
         );
     }
 
-    // 优先使用控制器的时长（已经过修复），回退到原始文件时长
     const displayDuration = controls?.duration || audioFile.duration || 0;
     const displayCurrentTime = controls?.currentTime || 0;
 
@@ -81,8 +101,25 @@ export const SimpleAudioPlayer: React.FC<SimpleAudioPlayerProps> = ({
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.3 }}
         >
-            {/* 文件信息 */}
-            <div className="audio-info">
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept="audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/mp4,audio/aac,audio/webm,audio/flac,.mp3,.wav,.ogg,.m4a,.aac,.webm,.flac"
+                onChange={handleFileInput}
+                className="hidden"
+            />
+
+            {/* 上传位置：音频信息区，可拖拽文件到此处替换，或点击选择文件 */}
+            <div
+                className={`audio-info upload-zone${isDragOver ? ' drag-over' : ''}`}
+                onClick={pickFile}
+                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragOver(true); }}
+                onDragLeave={(e) => {
+                    if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDragOver(false);
+                }}
+                onDrop={handleDrop}
+                title="拖拽音频文件到此处替换，或点击选择其他文件"
+            >
                 <div className="file-icon">🎵</div>
                 <div className="file-details">
                     <h3 className="file-name">{audioFile.name}</h3>
@@ -91,12 +128,13 @@ export const SimpleAudioPlayer: React.FC<SimpleAudioPlayerProps> = ({
                         {displayDuration ? ` ${formatTime(displayDuration)}` : ' 未知时长'}
                     </p>
                 </div>
+                <span className="replace-hint">🔄 拖拽/点击替换</span>
             </div>
 
             {/* 自定义音频播放器 */}
             {controls ? (
                 <div className="custom-player">
-                    {/* 播放控制按钮 */}
+                    {/* 播放控制按钮 + 状态 + 移除文件 */}
                     <div className="player-controls">
                         <button
                             onClick={controls.stop}
@@ -115,6 +153,26 @@ export const SimpleAudioPlayer: React.FC<SimpleAudioPlayerProps> = ({
                         >
                             {controls.isPlaying ? '⏸️' : '▶️'}
                         </button>
+
+                        {!controls.isLoaded && (
+                            <span className="status loading">⏳ 加载中...</span>
+                        )}
+                        {controls.isLoaded && !controls.isPlaying && (
+                            <span className="status ready">✅ 就绪</span>
+                        )}
+                        {controls.isPlaying && (
+                            <span className="status playing">🎵 播放中</span>
+                        )}
+
+                        {onClearAudio && (
+                            <button
+                                onClick={onClearAudio}
+                                className="remove-file-btn"
+                                title="移除文件"
+                            >
+                                🗑️ 移除文件
+                            </button>
+                        )}
                     </div>
 
                     {/* 进度条 */}
@@ -184,54 +242,6 @@ export const SimpleAudioPlayer: React.FC<SimpleAudioPlayerProps> = ({
                             {Math.round(controls.volume * 100)}%
                         </span>
                     </div>
-
-                    {/* 状态指示器和文件操作 */}
-                    <div className="status-section">
-                        <div className="status-indicators">
-                            {!controls.isLoaded && (
-                                <span className="status loading">⏳ 加载中...</span>
-                            )}
-                            {controls.isLoaded && !controls.isPlaying && (
-                                <span className="status ready">
-                                    ✅ 就绪
-                                </span>
-                            )}
-                            {controls.isPlaying && (
-                                <span className="status playing">
-                                    🎵 播放中
-                                </span>
-                            )}
-                        </div>
-
-                        {/* 文件操作按钮 */}
-                        {(onClearAudio || onSelectNewFile) && (
-                            <motion.div
-                                className="file-actions"
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.3 }}
-                            >
-                                {onClearAudio && (
-                                    <button
-                                        onClick={onClearAudio}
-                                        className="action-btn clear-btn"
-                                        title="移除文件"
-                                    >
-                                        🗑️ 移除文件
-                                    </button>
-                                )}
-                                {onSelectNewFile && (
-                                    <button
-                                        onClick={onSelectNewFile}
-                                        className="action-btn select-btn"
-                                        title="选择其他文件"
-                                    >
-                                        📁 选择其他文件
-                                    </button>
-                                )}
-                            </motion.div>
-                        )}
-                    </div>
                 </div>
             ) : (
                 /* 回退到基础播放器 */
@@ -250,4 +260,4 @@ export const SimpleAudioPlayer: React.FC<SimpleAudioPlayerProps> = ({
             </div>
         </motion.div>
     );
-}; 
+};

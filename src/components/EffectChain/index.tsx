@@ -1,23 +1,5 @@
 import React, { useState } from 'react';
-import {
-    DndContext,
-    closestCenter,
-    KeyboardSensor,
-    PointerSensor,
-    useSensor,
-    useSensors,
-    DragEndEvent,
-} from '@dnd-kit/core';
-import {
-    arrayMove,
-    SortableContext,
-    sortableKeyboardCoordinates,
-    verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
-import {
-    restrictToVerticalAxis,
-    restrictToParentElement,
-} from '@dnd-kit/modifiers';
+import { Reorder } from 'framer-motion';
 import { EffectConfig, EffectType, EqBandData, ShaperPoint } from '../../types/audio';
 import { EffectItem } from './EffectItem';
 import './styles.css';
@@ -47,33 +29,12 @@ export const EffectChain: React.FC<EffectChainProps> = ({
 }) => {
     const [isDragOver, setIsDragOver] = useState(false);
 
-    const sensors = useSensors(
-        useSensor(PointerSensor, {
-            activationConstraint: {
-                distance: 8,
-            },
-        }),
-        useSensor(KeyboardSensor, {
-            coordinateGetter: sortableKeyboardCoordinates,
-        })
-    );
-
-    const handleDragEnd = (event: DragEndEvent) => {
-        const { active, over } = event;
-
-        if (over && active.id !== over.id) {
-            const oldIndex = effects.findIndex((effect) => effect.id === active.id);
-            const newIndex = effects.findIndex((effect) => effect.id === over.id);
-
-            if (oldIndex !== -1 && newIndex !== -1) {
-                const reorderedEffects = arrayMove(effects, oldIndex, newIndex);
-                const updatedEffects = reorderedEffects.map((effect, index) => ({
-                    ...effect,
-                    order: index,
-                }));
-                onReorderEffects(updatedEffects);
-            }
-        }
+    // Reorder 回调返回新顺序的 id 数组，映射回 effects 并刷新 order 字段
+    const handleReorder = (newOrder: string[]) => {
+        const reordered = newOrder
+            .map((id) => effects.find((effect) => effect.id === id))
+            .filter((effect): effect is EffectConfig => Boolean(effect));
+        onReorderEffects(reordered.map((effect, index) => ({ ...effect, order: index })));
     };
 
     const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -106,7 +67,7 @@ export const EffectChain: React.FC<EffectChainProps> = ({
                 <div className="empty-state">
                     <div className="empty-icon">🎛️</div>
                     <h3>效果器链为空</h3>
-                    <p>从右侧效果器库拖拽效果器到这里，或直接点击效果器添加</p>
+                    <p>从效果器库拖拽效果器到这里，或直接点击效果器添加</p>
                 </div>
             ) : (
                 <>
@@ -117,32 +78,26 @@ export const EffectChain: React.FC<EffectChainProps> = ({
                         </div>
                     </div>
 
-                    <DndContext
-                        sensors={sensors}
-                        collisionDetection={closestCenter}
-                        onDragEnd={handleDragEnd}
-                        modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+                    <Reorder.Group
+                        axis="y"
+                        as="div"
+                        values={effects.map((effect) => effect.id)}
+                        onReorder={handleReorder}
+                        className="effects-list"
                     >
-                        <SortableContext
-                            items={effects.map(effect => effect.id)}
-                            strategy={verticalListSortingStrategy}
-                        >
-                            <div className="effects-list">
-                                {effects.map((effect, index) => (
-                                    <EffectItem
-                                        key={effect.id}
-                                        effect={effect}
-                                        index={index}
-                                        onRemove={() => onRemoveEffect(effect.id)}
-                                        onToggle={() => onToggleEffect(effect.id)}
-                                        onUpdate={(parameters) => onUpdateEffect(effect.id, parameters)}
-                                        onUpdateEqBands={(bands) => onUpdateEffectEqBands(effect.id, bands)}
-                                        onUpdateShaperPoints={(points) => onUpdateEffectShaperPoints(effect.id, points)}
-                                    />
-                                ))}
-                            </div>
-                        </SortableContext>
-                    </DndContext>
+                        {effects.map((effect, index) => (
+                            <EffectItem
+                                key={effect.id}
+                                effect={effect}
+                                index={index}
+                                onRemove={() => onRemoveEffect(effect.id)}
+                                onToggle={() => onToggleEffect(effect.id)}
+                                onUpdate={(parameters) => onUpdateEffect(effect.id, parameters)}
+                                onUpdateEqBands={(bands) => onUpdateEffectEqBands(effect.id, bands)}
+                                onUpdateShaperPoints={(points) => onUpdateEffectShaperPoints(effect.id, points)}
+                            />
+                        ))}
+                    </Reorder.Group>
                 </>
             )}
         </div>

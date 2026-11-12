@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+import { Reorder, useDragControls } from 'framer-motion';
 import { EffectConfig, EffectType, EqBandData, ShaperPoint } from '../../types/audio';
 import { effectParameterDefinitions } from '../../utils/audioUtils';
 import { Knob } from '../UI/Knob';
@@ -54,13 +53,7 @@ export const EffectItem: React.FC<EffectItemProps> = ({
     onUpdateShaperPoints,
 }) => {
     const [isExpanded, setIsExpanded] = useState(false);
-    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: effect.id });
-
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-        opacity: isDragging ? 0.5 : 1,
-    };
+    const dragControls = useDragControls();
 
     const effectParams = effectParameterDefinitions[effect.type];
     const params = Object.entries(effectParams);
@@ -70,13 +63,21 @@ export const EffectItem: React.FC<EffectItemProps> = ({
     const setParam = (name: string, value: number) => onUpdate({ ...effect.parameters, [name]: value });
 
     return (
-        <div
-            ref={setNodeRef}
-            style={style}
-            className={`effect-item ${!effect.enabled ? 'disabled' : ''} ${isDragging ? 'dragging' : ''}`}
+        <Reorder.Item
+            value={effect.id}
+            dragListener={false}
+            dragControls={dragControls}
+            whileDrag={{
+                scale: 1.02,
+                zIndex: 1000,
+                boxShadow: '0 12px 35px rgba(0, 0, 0, 0.6), 0 0 30px rgba(0, 212, 255, 0.3)',
+            }}
+            transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+            className={`effect-item ${!effect.enabled ? 'disabled' : ''}`}
+            style={{ position: 'relative' }}
         >
             <div className="effect-header">
-                <div className="effect-drag-handle" {...attributes} {...listeners}>
+                <div className="effect-drag-handle" onPointerDown={(e) => dragControls.start(e)}>
                     <span className="drag-icon">⋮⋮</span>
                 </div>
 
@@ -208,6 +209,6 @@ export const EffectItem: React.FC<EffectItemProps> = ({
                     )}
                 </div>
             )}
-        </div>
+        </Reorder.Item>
     );
 };
