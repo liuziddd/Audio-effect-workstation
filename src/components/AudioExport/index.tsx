@@ -25,7 +25,7 @@ export const AudioExport: React.FC<AudioExportProps> = ({
 
     return (
         <motion.div
-            className={`audio-export border border-white/10 rounded-xl p-6 shadow-2xl ${className}`}
+            className={`audio-export border border-white/10 rounded-3xl p-6 shadow-2xl ${className}`}
             style={{ background: 'rgba(20, 20, 26, 0.55)', backdropFilter: 'blur(24px) saturate(140%)', WebkitBackdropFilter: 'blur(24px) saturate(140%)' }}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}

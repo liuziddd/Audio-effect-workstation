@@ -2,7 +2,7 @@
 .effect-chain {
     background: linear-gradient(135deg, var(--surface) 0%, var(--surface) 100%);
     border: 1px solid var(--surface-2);
-    border-radius: 16px;
+    border-radius: 24px;
     padding: 24px;
     box-shadow: 
         0 8px 32px rgba(0, 0, 0, 0.4),

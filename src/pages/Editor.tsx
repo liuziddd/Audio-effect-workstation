@@ -186,7 +186,7 @@ export const Editor = () => {
 
             {/* 左侧固定侧边栏（非收纳、可调宽），上中下三段 */}
             <div
-                className="fixed left-0 top-0 h-full z-40 border-r border-white/10 flex flex-col overflow-hidden rounded-tr-2xl"
+                className="fixed left-0 top-0 h-full z-40 border-r border-white/10 flex flex-col overflow-hidden rounded-tr-3xl"
                 style={{ width: leftWidth, background: GLASS_BG, backdropFilter: GLASS_BLUR, WebkitBackdropFilter: GLASS_BLUR, boxShadow: '14px 0 42px rgba(0,0,0,0.45)' }}
             >
                 {/* 上段：页面切换按钮 + 主题开关（全局浮层），标题在图标下方；分割线随之下移 */}
@@ -197,7 +197,7 @@ export const Editor = () => {
                             collapsed ? 'max-w-0 opacity-0' : 'opacity-100'
                         }`}
                     >
-                        音频效果工作站
+                        音频工作站
                     </span>
                 </div>
 
@@ -265,7 +265,7 @@ export const Editor = () => {
 
             {/* 效果器库：藏在侧栏后（景深遮罩），右缘漏出一小条手柄，hover 抽出 */}
             <motion.div
-                className="fixed top-0 h-full z-30 flex items-stretch overflow-hidden rounded-tr-2xl"
+                className="fixed top-0 h-full z-30 flex items-stretch overflow-hidden rounded-tr-3xl"
                 style={{
                     left: leftWidth,
                     width: LIBRARY_PANEL_WIDTH,
@@ -311,7 +311,7 @@ export const Editor = () => {
             <AnimatePresence>
                 {activeTool && (
                     <motion.div
-                        className="fixed top-0 h-full z-50 border-r border-white/10 shadow-2xl overflow-hidden rounded-tr-2xl"
+                        className="fixed top-0 h-full z-50 border-r border-white/10 shadow-2xl overflow-hidden rounded-tr-3xl"
                         style={{ left: leftWidth, width: 400, background: GLASS_BG, backdropFilter: GLASS_BLUR, WebkitBackdropFilter: GLASS_BLUR }}
                         initial={{ x: -400, opacity: 0 }}
                         animate={{ x: 0, opacity: 1 }}
@@ -368,7 +368,7 @@ export const Editor = () => {
                                     transition={{ duration: 0.6, delay: 0.3 }}
                                 >
                                     <div
-                                        className="border border-white/10 rounded-2xl p-6 shadow-2xl h-fit"
+                                        className="border border-white/10 rounded-3xl p-6 shadow-2xl h-fit"
                                         data-effect-dropzone
                                         style={{ background: 'var(--glass-strong)', backdropFilter: 'blur(24px) saturate(150%)', WebkitBackdropFilter: 'blur(24px) saturate(150%)' }}
                                     >

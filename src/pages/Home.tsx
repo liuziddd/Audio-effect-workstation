@@ -170,7 +170,7 @@ export const Home = ({ onStart }: HomeProps) => {
             </motion.p>
 
             <h1 className="text-6xl md:text-8xl font-black leading-tight">
-                <BlurReveal text="音频效果工作站" />
+                <BlurReveal text="音频工作站" />
             </h1>
 
             <motion.p

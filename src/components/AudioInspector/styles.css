@@ -10,7 +10,7 @@
     display: block;
     padding: 14px;
     border: 1px dashed rgba(36, 80, 255, 0.4);
-    border-radius: 10px;
+    border-radius: 16px;
     background: rgba(36, 80, 255, 0.04);
     color: var(--text);
     text-align: center;
@@ -38,7 +38,7 @@
 .inspector-card {
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 10px;
+    border-radius: 16px;
     padding: 12px;
 }
 
@@ -62,7 +62,7 @@
     justify-content: center;
     gap: 6px;
     padding: 16px 10px;
-    border-radius: 10px;
+    border-radius: 14px;
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.08);
 }
