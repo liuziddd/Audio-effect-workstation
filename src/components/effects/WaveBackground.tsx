@@ -29,9 +29,14 @@ const BLOBS = [
     { x: 0.84, y: 0.92, r: 0.12, a: 1.15, sx: 0.09, sy: 0.11, p: 1.4 },
 ];
 
-const CELL = 14;
+const CELL = 16;
+const FRAME_MS = 40; // 25fps
+type Pt = [number, number];
 
-/** 编辑页背景：实时波动的拓扑等高线（marching squares），线条偏灰 */
+/** 端点量化成整数 key，用于把离散线段串成连续轮廓 */
+const keyOf = (x: number, y: number) => Math.round(x * 64) * 100000 + Math.round(y * 64);
+
+/** 编辑页背景：实时波动的拓扑等高线（marching squares + 轮廓串接 + 中点二次贝塞尔平滑） */
 export const WaveBackground = ({ levels = 22, speed = 0.19 }: WaveBackgroundProps) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -79,9 +84,35 @@ export const WaveBackground = ({ levels = 22, speed = 0.19 }: WaveBackgroundProp
             return v;
         };
 
+        /** 中点二次贝塞尔：每个折点当控制点，落点取相邻两点中点，折角被抹成圆滑过渡 */
+        const strokeChain = (pts: Pt[]) => {
+            const n = pts.length;
+            if (n < 2) return;
+            const closed = keyOf(pts[0][0], pts[0][1]) === keyOf(pts[n - 1][0], pts[n - 1][1]);
+            if (closed && n > 3) {
+                const loop = pts.slice(0, -1);
+                const m = loop.length;
+                ctx.moveTo((loop[m - 1][0] + loop[0][0]) / 2, (loop[m - 1][1] + loop[0][1]) / 2);
+                for (let i = 0; i < m; i++) {
+                    const cur = loop[i];
+                    const next = loop[(i + 1) % m];
+                    ctx.quadraticCurveTo(cur[0], cur[1], (cur[0] + next[0]) / 2, (cur[1] + next[1]) / 2);
+                }
+            } else {
+                ctx.moveTo(pts[0][0], pts[0][1]);
+                for (let i = 1; i < n - 1; i++) {
+                    ctx.quadraticCurveTo(
+                        pts[i][0], pts[i][1],
+                        (pts[i][0] + pts[i + 1][0]) / 2, (pts[i][1] + pts[i + 1][1]) / 2,
+                    );
+                }
+                ctx.lineTo(pts[n - 1][0], pts[n - 1][1]);
+            }
+        };
+
         const draw = (now: number) => {
             raf = requestAnimationFrame(draw);
-            if (now - lastFrame < 33) return; // 约 30fps
+            if (now - lastFrame < FRAME_MS) return;
             lastFrame = now;
             const t = now * 0.001 * speed;
 
@@ -96,10 +127,26 @@ export const WaveBackground = ({ levels = 22, speed = 0.19 }: WaveBackgroundProp
             const light = document.documentElement.classList.contains('light');
             ctx.strokeStyle = light ? 'rgba(72, 78, 90, 0.42)' : 'rgba(186, 192, 204, 0.48)';
             ctx.lineWidth = 1.2;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
             ctx.beginPath();
 
             for (let l = 1; l <= levels; l++) {
                 const L = 0.55 + l * 0.16;
+                // 扁平存每段 [ax, ay, bx, by]
+                const segs: number[] = [];
+                const ends = new Map<number, number[]>();
+                const addSeg = (p: Pt, q: Pt) => {
+                    const idx = segs.length;
+                    segs.push(p[0], p[1], q[0], q[1]);
+                    const ka = keyOf(p[0], p[1]);
+                    const kb = keyOf(q[0], q[1]);
+                    const la = ends.get(ka);
+                    if (la) la.push(idx); else ends.set(ka, [idx]);
+                    const lb = ends.get(kb);
+                    if (lb) lb.push(idx); else ends.set(kb, [idx]);
+                };
+
                 for (let j = 0; j < rows - 1; j++) {
                     for (let i = 0; i < cols - 1; i++) {
                         const a = grid[j * cols + i];
@@ -111,27 +158,55 @@ export const WaveBackground = ({ levels = 22, speed = 0.19 }: WaveBackgroundProp
 
                         const x = i * CELL;
                         const y = j * CELL;
-                        const top: [number, number] = [x + ((L - a) / (b - a || 1)) * CELL, y];
-                        const right: [number, number] = [x + CELL, y + ((L - b) / (c - b || 1)) * CELL];
-                        const bottom: [number, number] = [x + ((L - d) / (c - d || 1)) * CELL, y + CELL];
-                        const left: [number, number] = [x, y + ((L - a) / (d - a || 1)) * CELL];
-
-                        const seg = (p: [number, number], q: [number, number]) => {
-                            ctx.moveTo(p[0], p[1]);
-                            ctx.lineTo(q[0], q[1]);
-                        };
+                        const top: Pt = [x + ((L - a) / (b - a || 1)) * CELL, y];
+                        const right: Pt = [x + CELL, y + ((L - b) / (c - b || 1)) * CELL];
+                        const bottom: Pt = [x + ((L - d) / (c - d || 1)) * CELL, y + CELL];
+                        const left: Pt = [x, y + ((L - a) / (d - a || 1)) * CELL];
 
                         switch (code) {
-                            case 1: case 14: seg(left, bottom); break;
-                            case 2: case 13: seg(bottom, right); break;
-                            case 3: case 12: seg(left, right); break;
-                            case 4: case 11: seg(top, right); break;
-                            case 6: case 9: seg(top, bottom); break;
-                            case 7: case 8: seg(top, left); break;
-                            case 5: seg(top, right); seg(left, bottom); break;
-                            case 10: seg(top, left); seg(bottom, right); break;
+                            case 1: case 14: addSeg(left, bottom); break;
+                            case 2: case 13: addSeg(bottom, right); break;
+                            case 3: case 12: addSeg(left, right); break;
+                            case 4: case 11: addSeg(top, right); break;
+                            case 6: case 9: addSeg(top, bottom); break;
+                            case 7: case 8: addSeg(top, left); break;
+                            case 5: addSeg(top, right); addSeg(left, bottom); break;
+                            case 10: addSeg(top, left); addSeg(bottom, right); break;
                         }
                     }
+                }
+
+                // 把离散线段沿共享端点串成连续轮廓，交给平滑绘制
+                const used = new Uint8Array(segs.length / 4);
+                const walk = (startKey: number): Pt[] => {
+                    const chain: Pt[] = [];
+                    let cur = startKey;
+                    for (;;) {
+                        const candidates = ends.get(cur);
+                        if (!candidates) break;
+                        let next = -1;
+                        for (const idx of candidates) {
+                            if (!used[idx / 4]) { next = idx; break; }
+                        }
+                        if (next < 0) break;
+                        used[next / 4] = 1;
+                        const p: Pt = [segs[next], segs[next + 1]];
+                        const q: Pt = [segs[next + 2], segs[next + 3]];
+                        const other = keyOf(p[0], p[1]) === cur ? q : p;
+                        chain.push(other);
+                        cur = keyOf(other[0], other[1]);
+                    }
+                    return chain;
+                };
+
+                for (let s = 0; s < used.length; s++) {
+                    if (used[s]) continue;
+                    used[s] = 1;
+                    const a: Pt = [segs[s * 4], segs[s * 4 + 1]];
+                    const b: Pt = [segs[s * 4 + 2], segs[s * 4 + 3]];
+                    const head = walk(keyOf(a[0], a[1])).reverse();
+                    const tail = walk(keyOf(b[0], b[1]));
+                    strokeChain([...head, a, b, ...tail]);
                 }
             }
             ctx.stroke();

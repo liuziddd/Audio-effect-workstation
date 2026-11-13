@@ -234,6 +234,7 @@ const StemSeparator: React.FC = () => {
         setDownloadProgress(0);
         setSeparateProgress(0);
         setFileName(file.name);
+        setStatusText('正在解码音频…');
         setPhase('working');
 
         try {
@@ -261,6 +262,8 @@ const StemSeparator: React.FC = () => {
             const { buffer: modelBuffer, fromCache } = await loadModelBuffer((loaded, total) => {
                 setDownloadProgress(total ? loaded / total : 0);
             });
+            // 缓存命中也要把模型条置满，否则会一直停在 0% 造成「卡住」的错觉
+            setDownloadProgress(1);
             setStatusText(fromCache ? '已从浏览器缓存读取模型' : '模型已下载并缓存（下次无需再下载）');
 
             const worker = new StemSeparatorWorker();
@@ -317,13 +320,7 @@ const StemSeparator: React.FC = () => {
     };
 
     const busy = phase === 'working';
-    // 综合进度：模型下载占前半程，分离推理占后半程；缓存命中时直接进入分离
-    const overall = separateProgress > 0
-        ? 0.5 + separateProgress * 0.5
-        : downloadProgress > 0
-            ? downloadProgress * 0.5
-            : 0.04;
-    const stageLabel = separateProgress > 0 ? '分离音轨' : downloadProgress > 0 ? '准备模型' : '准备中';
+    // 两条独立进度条，各自 0→100%，不做阶段硬拼（硬拼会造成 4% 卡住再跳到 52%）
 
     return (
         <div className="stem-separator">
@@ -365,11 +362,20 @@ const StemSeparator: React.FC = () => {
                             <p className="stem-status">{statusText}</p>
                             <div className="stem-progress">
                                 <div className="stem-progress__head">
-                                    <span>{stageLabel}</span>
-                                    <span>{Math.round(overall * 100)}%</span>
+                                    <span>模型准备</span>
+                                    <span>{Math.round(downloadProgress * 100)}%</span>
                                 </div>
                                 <div className="stem-progress__track">
-                                    <span className="stem-progress__fill" style={{ transform: `scaleX(${overall})` }} />
+                                    <span className="stem-progress__fill" style={{ transform: `scaleX(${downloadProgress})` }} />
+                                </div>
+                            </div>
+                            <div className="stem-progress">
+                                <div className="stem-progress__head">
+                                    <span>分离推理</span>
+                                    <span>{Math.round(separateProgress * 100)}%</span>
+                                </div>
+                                <div className="stem-progress__track">
+                                    <span className="stem-progress__fill" style={{ transform: `scaleX(${separateProgress})` }} />
                                 </div>
                             </div>
                         </>

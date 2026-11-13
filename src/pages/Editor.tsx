@@ -18,9 +18,12 @@ const StemSeparator = lazy(() => import('../components/StemSeparator'));
 
 type ToolId = 'inspector' | 'separator' | 'master' | null;
 
-// 效果器库：漏出的玻璃手柄宽度 + 完整面板宽度
+// 效果器库：漏出的玻璃手柄宽度 + 完整面板宽度 + 展开时压在侧栏上的交叠宽度
 const LIBRARY_BAR_WIDTH = 36;
-const LIBRARY_PANEL_WIDTH = 236;
+const LIBRARY_PANEL_WIDTH = 268;
+const LIBRARY_OVERLAP = 28;
+// 面板左侧有 OVERLAP 被侧栏遮住，卡片左留白 = OVERLAP + 下面这个值（视觉可见余量）
+const LIBRARY_INSET = 28;
 
 // 银灰玻璃面板：半透明低饱和深灰 + 强模糊（配合银灰黑背景）
 const GLASS_BG = 'var(--glass)';
@@ -45,6 +48,10 @@ export const Editor = () => {
     const [libraryOpen, setLibraryOpen] = useState(false);
     // 左侧固定侧边栏默认宽度（px）。要改默认宽度，改这里的 240 即可。
     const [leftWidth, setLeftWidth] = useState(240);
+    // 「本地文件」区高度，可由中间分割线拖动，与下方工具栏此消彼长
+    const [fileSectionHeight, setFileSectionHeight] = useState(() =>
+        Math.min(window.innerHeight * 0.38, 320)
+    );
 
     // 侧边栏窄于该阈值时，文字折叠消失、只保留图标
     const collapsed = leftWidth < 140;
@@ -149,6 +156,25 @@ export const Editor = () => {
         window.addEventListener('mouseup', onUp);
     };
 
+    const startSplitResize = (e: React.PointerEvent) => {
+        e.preventDefault();
+        const startY = e.clientY;
+        const startHeight = fileSectionHeight;
+        const onMove = (ev: PointerEvent) => {
+            // 给下方工具栏至少留 190px，给文件区至少留 120px
+            const max = window.innerHeight - 190;
+            setFileSectionHeight(Math.min(max, Math.max(120, startHeight + (ev.clientY - startY))));
+        };
+        const onUp = () => {
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerup', onUp);
+            window.removeEventListener('pointercancel', onUp);
+        };
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', onUp);
+        window.addEventListener('pointercancel', onUp);
+    };
+
     return (
         <div
             className="editor-scope min-h-screen font-sans overflow-x-hidden"
@@ -175,8 +201,8 @@ export const Editor = () => {
                     </span>
                 </div>
 
-                {/* 中段：本地文件浏览器（高度受限，让下方工具栏上移） */}
-                <div className="flex-shrink-0 flex flex-col overflow-hidden" style={{ height: 'min(38vh, 320px)' }}>
+                {/* 中段：本地文件浏览器，高度由下方分割线拖动控制 */}
+                <div className="flex-shrink-0 flex flex-col overflow-hidden" style={{ height: fileSectionHeight }}>
                     <div className="px-3 pt-3 pb-2 flex items-center gap-1.5 flex-shrink-0">
                         <FolderOpen className="w-3.5 h-3.5 text-white/60 flex-shrink-0" />
                         <span
@@ -192,9 +218,18 @@ export const Editor = () => {
                     </div>
                 </div>
 
-                {/* 下段：实用工具栏（带标题），紧跟文件区，剩余空间留在底部 */}
-                <div className="px-3 pt-3 pb-3 border-t border-white/10 flex-shrink-0">
-                    <div className={`flex items-center gap-1.5 mb-2 ${collapsed ? 'justify-center' : ''}`}>
+                {/* 可拖拽的水平分割线：调整「本地文件」与「实用工具」两块的分割高度 */}
+                <div
+                    className="h-2 flex-shrink-0 cursor-row-resize group relative"
+                    onPointerDown={startSplitResize}
+                    title="拖动调整上下两块高度"
+                >
+                    <span className="absolute inset-x-3 top-1/2 -translate-y-1/2 h-px bg-white/10 group-hover:bg-[#5B7BFF] transition-colors" />
+                </div>
+
+                {/* 下段：实用工具栏（带标题），占据剩余空间 */}
+                <div className="px-3 pt-2 pb-3 flex-1 min-h-0 flex flex-col overflow-y-auto">
+                    <div className={`flex items-center gap-1.5 mb-2 flex-shrink-0 ${collapsed ? 'justify-center' : ''}`}>
                         <Wrench className="w-3.5 h-3.5 text-white/60 flex-shrink-0" />
                         <span className={`text-xs font-semibold text-white/60 uppercase tracking-wider whitespace-nowrap overflow-hidden ${collapsed ? 'max-w-0 opacity-0' : 'opacity-100'}`}>
                             实用工具
@@ -221,8 +256,6 @@ export const Editor = () => {
                     </div>
                 </div>
 
-                <div className="flex-1 min-h-0" />
-
                 {/* 拖拽调宽手柄 */}
                 <div
                     className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-neon-blue/50 transition-colors"
@@ -241,17 +274,18 @@ export const Editor = () => {
                     WebkitBackdropFilter: 'blur(24px) saturate(140%)',
                 }}
                 initial={false}
-                animate={{ x: libraryOpen ? 0 : -(LIBRARY_PANEL_WIDTH - LIBRARY_BAR_WIDTH) }}
+                // 展开时保留一段负位移，让面板左侧压在侧栏下形成交叠，而不是整块平齐滑出
+                animate={{ x: libraryOpen ? -LIBRARY_OVERLAP : -(LIBRARY_PANEL_WIDTH - LIBRARY_BAR_WIDTH) }}
                 transition={{ type: 'spring', stiffness: 300, damping: 26 }}
                 onMouseEnter={() => setLibraryOpen(true)}
                 onMouseLeave={() => setLibraryOpen(false)}
             >
-                {/* 面板主体（卡片区，藏在侧栏后） */}
+                {/* 面板主体（卡片区，左侧与侧栏交叠；卡片左边留出更多余量） */}
                 <div className="h-full flex-1 flex flex-col overflow-hidden">
-                    <div className="px-4 py-3 border-b border-white/10">
+                    <div className="py-3 border-b border-white/10" style={{ paddingLeft: LIBRARY_OVERLAP + LIBRARY_INSET, paddingRight: 16 }}>
                         <h3 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>🎛️ 效果器库</h3>
                     </div>
-                    <div className="flex-1 overflow-y-auto p-3">
+                    <div className="flex-1 overflow-y-auto" style={{ paddingLeft: LIBRARY_OVERLAP + LIBRARY_INSET, paddingRight: 16, paddingTop: 12, paddingBottom: 12 }}>
                         <EffectLibrary onAddEffect={addEffect} />
                     </div>
                 </div>
