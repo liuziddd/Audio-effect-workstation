@@ -1,4 +1,5 @@
 import React, { useRef, useEffect } from 'react';
+import { useThemeTokens, type ThemeTokens } from '../../utils/theme';
 
 interface DynamicsGraphProps {
     /** 阈值 dB */
@@ -36,17 +37,18 @@ const draw = (
     threshold: number,
     ratio: number,
     knee: number,
-    color: string
+    color: string,
+    t: ThemeTokens
 ) => {
     ctx.clearRect(0, 0, WIDTH, HEIGHT);
-    ctx.fillStyle = '#101119';
+    ctx.fillStyle = t.canvas;
     ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
     ctx.font = '10px monospace';
     ctx.lineWidth = 1;
     // 网格
     for (let db = DB_MIN; db <= DB_MAX; db += 10) {
-        ctx.strokeStyle = db === 0 ? '#3a3e52' : '#232636';
+        ctx.strokeStyle = db === 0 ? t.grid : t.gridSoft;
         ctx.beginPath();
         ctx.moveTo(PAD, dbToY(db));
         ctx.lineTo(WIDTH - PAD, dbToY(db));
@@ -55,7 +57,7 @@ const draw = (
         ctx.moveTo(dbToX(db), PAD);
         ctx.lineTo(dbToX(db), HEIGHT - PAD);
         ctx.stroke();
-        ctx.fillStyle = '#5b6172';
+        ctx.fillStyle = t.tick;
         ctx.textAlign = 'right';
         ctx.fillText(`${db}`, PAD - 4, dbToY(db) + 3);
         ctx.textAlign = 'center';
@@ -63,7 +65,7 @@ const draw = (
     }
 
     // 对角线（无压缩参考）
-    ctx.strokeStyle = '#3a3e52';
+    ctx.strokeStyle = t.grid;
     ctx.setLineDash([5, 5]);
     ctx.beginPath();
     ctx.moveTo(dbToX(DB_MIN), dbToY(DB_MIN));
@@ -100,8 +102,9 @@ const draw = (
 };
 
 /** 压缩/限制曲线可视化（输入 dB → 输出 dB，含软拐点） */
-export const DynamicsGraph: React.FC<DynamicsGraphProps> = ({ threshold, ratio, knee, color = '#ff6b35' }) => {
+export const DynamicsGraph: React.FC<DynamicsGraphProps> = ({ threshold, ratio, knee, color = '#9CA3AF' }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const tokens = useThemeTokens();
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -112,8 +115,8 @@ export const DynamicsGraph: React.FC<DynamicsGraphProps> = ({ threshold, ratio, 
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
         ctx.scale(dpr, dpr);
-        draw(ctx, threshold, ratio, knee, color);
-    }, [threshold, ratio, knee, color]);
+        draw(ctx, threshold, ratio, knee, color, tokens);
+    }, [threshold, ratio, knee, color, tokens]);
 
     return (
         <div className="dynamics-graph">

@@ -1,12 +1,12 @@
 .simple-audio-player {
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-    border: 1px solid #2a2d3a;
+    background: linear-gradient(135deg, var(--surface) 0%, var(--surface) 100%);
+    border: 1px solid var(--surface-2);
     border-radius: 16px;
     padding: 24px;
     box-shadow:
         0 8px 32px rgba(0, 0, 0, 0.4),
         0 2px 8px rgba(0, 0, 0, 0.2),
-        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        inset 0 1px 0 var(--border);
 }
 
 .no-audio-message {
@@ -21,13 +21,13 @@
 }
 
 .no-audio-message h3 {
-    color: #a0a0a0;
+    color: var(--text-muted);
     margin: 0 0 8px 0;
     font-size: 1.2rem;
 }
 
 .no-audio-message p {
-    color: #707070;
+    color: var(--text-faint);
     margin: 0;
     font-size: 0.9rem;
 }
@@ -40,32 +40,32 @@
     padding: 16px;
     background: rgba(255, 255, 255, 0.05);
     border-radius: 12px;
-    border: 1px dashed rgba(255, 255, 255, 0.18);
+    border: 1px dashed var(--border-strong);
     cursor: pointer;
     transition: border-color 0.2s ease, background 0.2s ease;
 }
 
 .audio-info:hover {
-    border-color: rgba(0, 212, 255, 0.5);
-    background: rgba(0, 212, 255, 0.06);
+    border-color: rgba(36, 80, 255, 0.5);
+    background: rgba(36, 80, 255, 0.06);
 }
 
 .audio-info.drag-over {
-    border-color: #00d4ff;
-    background: rgba(0, 212, 255, 0.12);
-    box-shadow: 0 0 16px rgba(0, 212, 255, 0.25);
+    border-color: #2450FF;
+    background: rgba(36, 80, 255, 0.12);
+    box-shadow: 0 0 16px rgba(36, 80, 255, 0.25);
 }
 
 .replace-hint {
     flex-shrink: 0;
     font-size: 0.75rem;
-    color: #38bdf8;
+    color: #2450FF;
     white-space: nowrap;
 }
 
 .file-icon {
     font-size: 2.5rem;
-    filter: drop-shadow(0 0 8px rgba(0, 212, 255, 0.3));
+    filter: drop-shadow(0 0 8px rgba(36, 80, 255, 0.3));
 }
 
 .file-details {
@@ -73,7 +73,7 @@
 }
 
 .file-name {
-    color: #ffffff;
+    color: var(--text);
     margin: 0 0 4px 0;
     font-size: 1.1rem;
     font-weight: 600;
@@ -81,15 +81,15 @@
 }
 
 .file-meta {
-    color: #a0a0a0;
+    color: var(--text-muted);
     margin: 0;
     font-size: 0.85rem;
 }
 
 /* 自定义播放器样式 */
 .custom-player {
-    background: linear-gradient(135deg, #2a2d3a 0%, #1e1e30 100%);
-    border: 1px solid #3a3d4a;
+    background: linear-gradient(135deg, var(--surface-2) 0%, var(--surface) 100%);
+    border: 1px solid var(--surface-3);
     border-radius: 12px;
     padding: 20px;
     margin-bottom: 16px;
@@ -124,7 +124,7 @@
 }
 
 .control-btn {
-    background: linear-gradient(135deg, #00d4ff 0%, #8a2be2 100%);
+    background: linear-gradient(135deg, #2450FF 0%, #2450FF 100%);
     border: none;
     border-radius: 50%;
     width: 50px;
@@ -140,7 +140,7 @@
 
 .control-btn:hover:not(:disabled) {
     transform: scale(1.05);
-    box-shadow: 0 0 20px rgba(0, 212, 255, 0.4);
+    box-shadow: 0 0 20px rgba(36, 80, 255, 0.4);
 }
 
 .control-btn:disabled {
@@ -161,24 +161,24 @@
 }
 
 .control-btn.loop-btn.active {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    box-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
+    background: linear-gradient(135deg, #2450FF 0%, #2450FF 100%);
+    box-shadow: 0 0 20px rgba(36, 80, 255, 0.5);
     animation: loop-pulse 2s infinite;
 }
 
 .control-btn.loop-btn.active:hover:not(:disabled) {
-    box-shadow: 0 0 25px rgba(16, 185, 129, 0.7);
+    box-shadow: 0 0 25px rgba(36, 80, 255, 0.7);
 }
 
 @keyframes loop-pulse {
 
     0%,
     100% {
-        box-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
+        box-shadow: 0 0 20px rgba(36, 80, 255, 0.5);
     }
 
     50% {
-        box-shadow: 0 0 30px rgba(16, 185, 129, 0.8);
+        box-shadow: 0 0 30px rgba(36, 80, 255, 0.8);
     }
 }
 
@@ -190,7 +190,7 @@
 }
 
 .time-display {
-    color: #a0a0a0;
+    color: var(--text-muted);
     font-size: 0.85rem;
     font-family: 'Courier New', monospace;
     min-width: 45px;
@@ -201,44 +201,30 @@
     flex: 1;
 }
 
-.progress-bar {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 100%;
-    height: 8px;
-    background: linear-gradient(to right, #3a3d4a 0%, #2a2d3a 100%);
-    border-radius: 4px;
-    outline: none;
+/* CallChip 风格进度胶囊：圆角表面 + 从左侧擦过的填充层 */
+.progress-track {
+    position: relative;
+    flex: 1;
+    height: 20px;
+    border-radius: 10px;
+    background: var(--surface-3);
+    overflow: hidden;
     cursor: pointer;
+    touch-action: none;
 }
 
-.progress-bar::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 18px;
-    height: 18px;
-    background: #ffffff;
-    border-radius: 50%;
-    border: 2px solid #00d4ff;
-    cursor: pointer;
-    box-shadow: 0 0 10px rgba(0, 212, 255, 0.4);
-    transition: all 0.2s ease;
+.progress-fill {
+    position: absolute;
+    inset: 0;
+    border-radius: 10px;
+    background: var(--accent);
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform 0.06s linear;
 }
 
-.progress-bar::-webkit-slider-thumb:hover {
-    transform: scale(1.1);
-    box-shadow: 0 0 15px rgba(0, 212, 255, 0.6);
-}
-
-.progress-bar::-moz-range-thumb {
-    width: 18px;
-    height: 18px;
-    background: #ffffff;
-    border-radius: 50%;
-    border: 2px solid #00d4ff;
-    cursor: pointer;
-    box-shadow: 0 0 10px rgba(0, 212, 255, 0.4);
-    transition: all 0.2s ease;
+.progress-track:hover .progress-fill {
+    filter: brightness(1.1);
 }
 
 .volume-section {
@@ -251,49 +237,11 @@
 
 .volume-icon {
     font-size: 1.1em;
-    color: #a0a0a0;
-}
-
-.volume-slider {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 100px;
-    height: 4px;
-    background: linear-gradient(to right, #3a3d4a 0%, #2a2d3a 100%);
-    border-radius: 2px;
-    outline: none;
-    cursor: pointer;
-}
-
-.volume-slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 14px;
-    height: 14px;
-    background: #ffffff;
-    border-radius: 50%;
-    border: 2px solid #00d4ff;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.volume-slider::-webkit-slider-thumb:hover {
-    transform: scale(1.1);
-    box-shadow: 0 0 10px rgba(0, 212, 255, 0.4);
-}
-
-.volume-slider::-moz-range-thumb {
-    width: 14px;
-    height: 14px;
-    background: #ffffff;
-    border-radius: 50%;
-    border: 2px solid #00d4ff;
-    cursor: pointer;
-    transition: all 0.2s ease;
+    color: var(--text-muted);
 }
 
 .volume-display {
-    color: #a0a0a0;
+    color: var(--text-muted);
     font-size: 0.8rem;
     font-family: 'Courier New', monospace;
     min-width: 35px;
@@ -301,31 +249,31 @@
 
 /* 状态指示 */
 .status {
-    color: #a0a0a0;
+    color: var(--text-muted);
     font-size: 0.8rem;
     padding: 4px 12px;
     border-radius: 16px;
     background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--border);
     display: inline-block;
 }
 
 .status.loading {
-    color: #ffa500;
-    border-color: rgba(255, 165, 0, 0.3);
-    background: rgba(255, 165, 0, 0.1);
+    color: #9CA3AF;
+    border-color: rgba(156, 163, 175, 0.3);
+    background: rgba(156, 163, 175, 0.1);
 }
 
 .status.ready {
-    color: #00ff00;
-    border-color: rgba(0, 255, 0, 0.3);
-    background: rgba(0, 255, 0, 0.1);
+    color: #A6FF00;
+    border-color: rgba(166, 255, 0, 0.3);
+    background: rgba(166, 255, 0, 0.1);
 }
 
 .status.playing {
-    color: #00d4ff;
-    border-color: rgba(0, 212, 255, 0.3);
-    background: rgba(0, 212, 255, 0.1);
+    color: #2450FF;
+    border-color: rgba(36, 80, 255, 0.3);
+    background: rgba(36, 80, 255, 0.1);
 }
 
 /* 基础播放器样式 */
@@ -336,7 +284,7 @@
 .basic-audio-element {
     width: 100%;
     border-radius: 8px;
-    background: #2a2d3a;
+    background: var(--surface-2);
 }
 
 .play-hint {
@@ -345,7 +293,7 @@
 }
 
 .play-hint p {
-    color: #707070;
+    color: var(--text-faint);
     font-size: 0.8rem;
     margin: 0;
     line-height: 1.4;
@@ -379,10 +327,6 @@
     .volume-section {
         flex-wrap: wrap;
         gap: 8px;
-    }
-
-    .volume-slider {
-        width: 80px;
     }
 
     .player-controls {

@@ -18,20 +18,15 @@ export const AudioExport: React.FC<AudioExportProps> = ({
 
     const handleExport = async () => {
         if (!isEnabled) return;
-        try {
-            setIsExporting(true);
-            await onExport(customFilename.trim() || undefined);
-        } catch (error) {
-            console.error('导出失败:', error);
-        } finally {
-            setIsExporting(false);
-        }
+        setIsExporting(true);
+        await onExport(customFilename.trim() || undefined);
+        setIsExporting(false);
     };
 
     return (
         <motion.div
             className={`audio-export border border-white/10 rounded-xl p-6 shadow-2xl ${className}`}
-            style={{ background: 'linear-gradient(160deg, rgba(13,30,60,0.92) 0%, rgba(15,90,107,0.85) 100%)' }}
+            style={{ background: 'rgba(20, 20, 26, 0.55)', backdropFilter: 'blur(24px) saturate(140%)', WebkitBackdropFilter: 'blur(24px) saturate(140%)' }}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}

@@ -1,8 +1,9 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, Music, FileAudio, X, AlertCircle } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Upload, Music, FileAudio, X } from 'lucide-react';
 import clsx from 'clsx';
-import { validateAudioFile, formatFileSize, checkAudioSupport, testAudioPlayability } from '../../utils/audioUtils';
+import { validateAudioFile, formatFileSize, testAudioPlayability } from '../../utils/audioUtils';
+import { dragBridge } from '../../utils/dragBridge';
 import { Button } from '../UI/Button';
 
 interface AudioUploadProps {
@@ -22,69 +23,17 @@ export const AudioUpload: React.FC<AudioUploadProps> = ({
 }) => {
     const [isDragOver, setIsDragOver] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const clearError = useCallback(() => {
-        setError(null);
-    }, []);
-
     const handleFile = useCallback(async (file: File) => {
-        clearError();
         setIsLoading(true);
-
-        try {
-            console.log('🎵 开始处理文件:', file.name, 'Type:', file.type, 'Size:', formatFileSize(file.size));
-
-            // 第一步：基础验证（文件类型和大小）
-            const validation = validateAudioFile(file);
-            if (!validation.valid) {
-                throw new Error(validation.error + (validation.suggestion ? `\n建议: ${validation.suggestion}` : ''));
-            }
-
-            console.log('✅ 基础验证通过');
-
-            // 第二步：检查浏览器支持
-            const browserSupport = checkAudioSupport();
-            console.log('🔍 浏览器支持检查完成');
-
-            // 第三步：测试音频文件的实际可播放性
-            console.log('🧪 测试音频文件可播放性...');
-            const playabilityTest = await testAudioPlayability(file);
-
-            if (!playabilityTest.playable) {
-                const errorMsg = playabilityTest.error || '音频文件无法播放';
-                console.error('❌ 音频可播放性测试失败:', errorMsg);
-
-                // 提供更详细的错误信息和建议
-                let suggestion = '';
-                if (errorMsg.includes('格式不受支持')) {
-                    // const extension = file.name.split('.').pop()?.toLowerCase();
-                    const supportedFormats = Object.entries(browserSupport)
-                        .filter(([_, supported]) => supported)
-                        .map(([format]) => format.toUpperCase())
-                        .join(', ');
-                    suggestion = `\n当前浏览器支持的格式: ${supportedFormats}\n请尝试转换文件格式或使用其他浏览器。`;
-                } else if (errorMsg.includes('解码失败')) {
-                    suggestion = '\n文件可能已损坏，请尝试使用其他音频文件或重新编码文件。';
-                }
-
-                throw new Error(errorMsg + suggestion);
-            }
-
-            console.log('✅ 音频可播放性测试通过，时长:', playabilityTest.duration?.toFixed(2), '秒');
-
+        if (validateAudioFile(file) && await testAudioPlayability(file)) {
             setSelectedFile(file);
             onFileLoad(file);
-
-        } catch (err) {
-            console.error('❌ 文件处理失败:', err);
-            setError(err instanceof Error ? err.message : '文件处理失败');
-        } finally {
-            setIsLoading(false);
         }
-    }, [supportedFormats, maxSize, onFileLoad, clearError]);
+        setIsLoading(false);
+    }, [onFileLoad]);
 
     const handleDrop = useCallback((e: React.DragEvent) => {
         e.preventDefault();
@@ -94,8 +43,9 @@ export const AudioUpload: React.FC<AudioUploadProps> = ({
         if (disabled || isLoading) return;
 
         const files = Array.from(e.dataTransfer.files);
-        if (files.length > 0) {
-            handleFile(files[0]);
+        const file = files[0] ?? dragBridge.peek();
+        if (file) {
+            handleFile(file);
         }
     }, [disabled, isLoading, handleFile]);
 
@@ -125,11 +75,10 @@ export const AudioUpload: React.FC<AudioUploadProps> = ({
 
     const handleRemoveFile = useCallback(() => {
         setSelectedFile(null);
-        clearError();
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
         }
-    }, [clearError]);
+    }, []);
 
     const formatSupportedFormats = (): string => {
         // 创建一个去重的格式列表，优先显示常见格式
@@ -254,33 +203,8 @@ export const AudioUpload: React.FC<AudioUploadProps> = ({
                 </div>
             </motion.div>
 
-            {/* 错误提示 */}
-            <AnimatePresence>
-                {error && (
-                    <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="mt-4 p-4 bg-red-500 bg-opacity-10 border border-red-500 rounded-lg"
-                    >
-                        <div className="flex items-center space-x-2">
-                            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
-                            <p className="text-red-300 text-sm">{error}</p>
-                            <Button
-                                variant="orange"
-                                size="sm"
-                                onClick={clearError}
-                                className="ml-auto flex-shrink-0"
-                            >
-                                <X className="w-4 h-4" />
-                            </Button>
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
             {/* 上传提示 */}
-            {!selectedFile && !error && (
+            {!selectedFile && (
                 <div className="mt-4 p-4 bg-neon-blue bg-opacity-5 border border-neon-blue border-opacity-30 rounded-lg">
                     <div className="flex items-start space-x-2">
                         <Music className="w-5 h-5 text-neon-blue flex-shrink-0 mt-0.5" />

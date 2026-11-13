@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { EqBandData, EqBandType } from '../../types/audio';
 import { computeEqResponse } from '../../utils/eqResponse';
 import { createEqBand } from '../../utils/audioUtils';
+import { useThemeTokens, type ThemeTokens } from '../../utils/theme';
 
 interface EqGraphProps {
     bands: EqBandData[];
@@ -39,22 +40,22 @@ const yToGain = (y: number) => GAIN_MIN + (1 - (y - PAD) / (HEIGHT - 2 * PAD)) *
 
 const formatFreq = (freq: number) => (freq >= 1000 ? `${(freq / 1000).toFixed(freq % 1000 ? 1 : 0)}k` : `${Math.round(freq)}`) + 'Hz';
 
-const draw = (ctx: CanvasRenderingContext2D, bands: EqBandData[], selectedId: string | null) => {
+const draw = (ctx: CanvasRenderingContext2D, bands: EqBandData[], selectedId: string | null, t: ThemeTokens) => {
     ctx.clearRect(0, 0, WIDTH, HEIGHT);
-    ctx.fillStyle = '#101119';
+    ctx.fillStyle = t.canvas;
     ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
     // 水平 dB 网格线
     ctx.font = '10px monospace';
     for (let g = GAIN_MIN; g <= GAIN_MAX; g += 6) {
         const y = gainToY(g);
-        ctx.strokeStyle = g === 0 ? '#3a3e52' : '#232636';
+        ctx.strokeStyle = g === 0 ? t.grid : t.gridSoft;
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(PAD, y);
         ctx.lineTo(WIDTH - PAD, y);
         ctx.stroke();
-        ctx.fillStyle = '#5b6172';
+        ctx.fillStyle = t.tick;
         ctx.textAlign = 'right';
         ctx.fillText(`${g}`, PAD - 4, y + 3);
     }
@@ -62,12 +63,12 @@ const draw = (ctx: CanvasRenderingContext2D, bands: EqBandData[], selectedId: st
     // 垂直频率网格线
     [30, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000].forEach((f) => {
         const x = freqToX(f);
-        ctx.strokeStyle = '#232636';
+        ctx.strokeStyle = t.gridSoft;
         ctx.beginPath();
         ctx.moveTo(x, PAD);
         ctx.lineTo(x, HEIGHT - PAD);
         ctx.stroke();
-        ctx.fillStyle = '#5b6172';
+        ctx.fillStyle = t.tick;
         ctx.textAlign = 'center';
         ctx.fillText(f >= 1000 ? `${f / 1000}k` : `${f}`, x, HEIGHT - 6);
     });
@@ -84,14 +85,14 @@ const draw = (ctx: CanvasRenderingContext2D, bands: EqBandData[], selectedId: st
         if (i === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
     });
-    ctx.strokeStyle = '#00d4ff';
+    ctx.strokeStyle = t.accent;
     ctx.lineWidth = 2;
     ctx.stroke();
 
     ctx.lineTo(WIDTH - PAD, gainToY(0));
     ctx.lineTo(PAD, gainToY(0));
     ctx.closePath();
-    ctx.fillStyle = 'rgba(0, 212, 255, 0.12)';
+    ctx.fillStyle = 'rgba(36, 80, 255, 0.12)';
     ctx.fill();
 
     // 频段控制点（gain 无效类型固定在 0dB 线上）
@@ -101,15 +102,15 @@ const draw = (ctx: CanvasRenderingContext2D, bands: EqBandData[], selectedId: st
         const x = freqToX(band.freq);
         ctx.beginPath();
         ctx.arc(x, y, selected ? 7 : 5, 0, Math.PI * 2);
-        ctx.fillStyle = selected ? '#ffffff' : '#00d4ff';
+        ctx.fillStyle = selected ? t.pointFill : t.accent;
         ctx.fill();
-        ctx.strokeStyle = '#0a0b12';
+        ctx.strokeStyle = t.pointStroke;
         ctx.lineWidth = 1.5;
         ctx.stroke();
         if (selected) {
             ctx.beginPath();
             ctx.arc(x, y, 11, 0, Math.PI * 2);
-            ctx.strokeStyle = '#00d4ff';
+            ctx.strokeStyle = t.accent;
             ctx.lineWidth = 1;
             ctx.stroke();
         }
@@ -129,6 +130,7 @@ export const EqGraph: React.FC<EqGraphProps> = ({ bands, onChange }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const dragRef = useRef<string | null>(null);
     const [selectedId, setSelectedId] = useState<string | null>(null);
+    const tokens = useThemeTokens();
 
     const selected = bands.find((b) => b.id === selectedId) ?? null;
 
@@ -146,8 +148,8 @@ export const EqGraph: React.FC<EqGraphProps> = ({ bands, onChange }) => {
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
         ctx.scale(dpr, dpr);
-        draw(ctx, bands, selectedId);
-    }, [bands, selectedId]);
+        draw(ctx, bands, selectedId, tokens);
+    }, [bands, selectedId, tokens]);
 
     const hitBand = useCallback(
         (point: { x: number; y: number }) => {

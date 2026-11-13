@@ -46,8 +46,8 @@ export const WaveformView = ({ peaks, channels }: WaveformViewProps) => {
             ctx.stroke();
 
             const gradient = ctx.createLinearGradient(0, top, 0, top + trackHeight);
-            gradient.addColorStop(0, '#00d4ff');
-            gradient.addColorStop(1, '#b84cff');
+            gradient.addColorStop(0, '#2450FF');
+            gradient.addColorStop(1, '#5B7BFF');
             ctx.fillStyle = gradient;
             ctx.beginPath();
             const step = w / track.length;
@@ -85,8 +85,8 @@ export const SpectrumView = ({ spectrum }: SpectrumViewProps) => {
         const step = w / spectrum.length;
 
         const gradient = ctx.createLinearGradient(0, 0, 0, h);
-        gradient.addColorStop(0, '#00d4ff');
-        gradient.addColorStop(1, '#b84cff');
+        gradient.addColorStop(0, '#2450FF');
+        gradient.addColorStop(1, '#5B7BFF');
         ctx.fillStyle = gradient;
         ctx.beginPath();
         ctx.moveTo(0, h);

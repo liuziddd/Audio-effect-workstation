@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Home } from './pages/Home';
 import { Editor } from './pages/Editor';
 import { MorphLogo } from './components/MorphLogo';
+import { ThemeToggle } from './components/ThemeToggle';
 
 type Page = 'home' | 'editor';
 type Origin = { x: number; y: number };
@@ -11,11 +12,25 @@ type Phase = 'idle' | 'cover' | 'uncover';
 /** Logo 中心点（fixed left-4 top-4，尺寸 44） */
 const LOGO_ORIGIN: Origin = { x: 38, y: 38 };
 
+const THEME_KEY = 'aew-theme';
+
+const getInitialTheme = (): 'dark' | 'light' =>
+    localStorage.getItem(THEME_KEY) === 'light' ? 'light' : 'dark';
+
 function App() {
     const [page, setPage] = useState<Page>('home');
     const [target, setTarget] = useState<Page>('home');
     const [origin, setOrigin] = useState<Origin>(LOGO_ORIGIN);
     const [phase, setPhase] = useState<Phase>('idle');
+    const [theme, setTheme] = useState<'dark' | 'light'>(getInitialTheme);
+
+    // 主题切换：html 上增删 light class（暗色为默认），并持久化
+    useEffect(() => {
+        const root = document.documentElement;
+        root.classList.toggle('light', theme === 'light');
+        root.classList.toggle('dark', theme === 'dark');
+        localStorage.setItem(THEME_KEY, theme);
+    }, [theme]);
 
     const navigate = (next: Page, o: Origin) => {
         if (phase !== 'idle') return;
@@ -41,7 +56,7 @@ function App() {
     const clipPath = `circle(${radius} at ${origin.x}px ${origin.y}px)`;
 
     return (
-        <div className="min-h-screen bg-[#0a0a0a] text-white font-sans">
+        <div className="min-h-screen font-sans">
             {page === 'home' ? (
                 <Home onStart={(o) => navigate('editor', o)} />
             ) : (
@@ -58,13 +73,17 @@ function App() {
             >
                 <div
                     className="w-full h-full"
-                    style={{ background: 'linear-gradient(135deg, #0a0a14 0%, #12122a 50%, #0a0a14 100%)' }}
+                    style={{ background: 'linear-gradient(135deg, var(--bg) 0%, var(--surface) 50%, var(--bg) 100%)' }}
                 />
             </motion.div>
 
-            {/* 全局固定 Logo（始终在遮罩上方，提供视觉固定；点击返回首页） */}
-            <div className="fixed left-4 top-4 z-[110]">
+            {/* 左上角：页面切换按钮 + 主题开关并排（叠在侧边栏顶部） */}
+            <div className="fixed left-4 top-4 z-[110] flex items-center gap-3">
                 <MorphLogo onClick={togglePage} active={phase !== 'idle'} />
+                <ThemeToggle
+                    checked={theme === 'light'}
+                    onChange={(light) => setTheme(light ? 'light' : 'dark')}
+                />
             </div>
         </div>
     );

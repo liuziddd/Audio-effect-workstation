@@ -45,52 +45,13 @@ const WeChatButton = () => {
     );
 };
 
-/* ===== 极光背景：三团大模糊渐变光斑缓慢漂移 ===== */
-const Aurora = () => (
-    <div className="fixed inset-0 overflow-hidden pointer-events-none" aria-hidden>
-        <motion.div
-            className="absolute -top-1/4 -left-1/4 w-[70vw] h-[70vw] rounded-full opacity-40"
-            style={{ background: 'radial-gradient(circle, rgba(0,212,255,0.55) 0%, transparent 65%)', filter: 'blur(80px)' }}
-            animate={{ x: [0, 160, -40, 0], y: [0, 90, 160, 0], scale: [1, 1.25, 1.05, 1] }}
-            transition={{ duration: 22, repeat: Infinity, ease: 'easeInOut' }}
-        />
-        <motion.div
-            className="absolute -bottom-1/4 -right-1/4 w-[65vw] h-[65vw] rounded-full opacity-40"
-            style={{ background: 'radial-gradient(circle, rgba(184,76,255,0.55) 0%, transparent 65%)', filter: 'blur(80px)' }}
-            animate={{ x: [0, -140, 60, 0], y: [0, -100, -180, 0], scale: [1.1, 1, 1.3, 1.1] }}
-            transition={{ duration: 26, repeat: Infinity, ease: 'easeInOut' }}
-        />
-        <motion.div
-            className="absolute top-1/3 left-1/2 w-[45vw] h-[45vw] rounded-full opacity-30"
-            style={{ background: 'radial-gradient(circle, rgba(57,255,115,0.45) 0%, transparent 65%)', filter: 'blur(80px)' }}
-            animate={{ x: [0, 120, -80, 0], y: [0, -120, 60, 0], scale: [1, 1.2, 0.95, 1] }}
-            transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
-        />
-    </div>
-);
-
-/* ===== 网格背景 ===== */
-const Grid = () => (
-    <div
-        className="fixed inset-0 pointer-events-none opacity-[0.12]"
-        aria-hidden
-        style={{
-            backgroundImage:
-                'linear-gradient(rgba(0,212,255,0.35) 1px, transparent 1px), linear-gradient(90deg, rgba(0,212,255,0.35) 1px, transparent 1px)',
-            backgroundSize: '48px 48px',
-            maskImage: 'radial-gradient(ellipse 70% 60% at 50% 40%, #000 30%, transparent 100%)',
-            WebkitMaskImage: 'radial-gradient(ellipse 70% 60% at 50% 40%, #000 30%, transparent 100%)',
-        }}
-    />
-);
-
 /* ===== 大字逐字模糊揭示 ===== */
 const BlurReveal = ({ text }: { text: string }) => (
     <span aria-label={text}>
         {text.split('').map((char, i) => (
             <motion.span
                 key={i}
-                className="inline-block bg-gradient-to-b from-white to-neon-blue bg-clip-text text-transparent"
+                className="inline-block bg-gradient-to-b from-[var(--text)] via-[#B8C4D8] to-neon-purple bg-clip-text text-transparent"
                 initial={{ opacity: 0, y: 30, filter: 'blur(14px)' }}
                 animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
                 transition={{ delay: 0.35 + i * 0.07, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
@@ -120,32 +81,40 @@ const MagneticButton = ({ onClick, children }: { onClick: (origin: { x: number; 
             onClick={(e) => onClick({ x: e.clientX, y: e.clientY })}
             animate={{ x: offset.x, y: offset.y }}
             transition={{ type: 'spring', stiffness: 180, damping: 14 }}
-            className="group relative mt-12 px-12 py-4 rounded-full font-bold text-lg text-white overflow-hidden shadow-[0_0_40px_rgba(0,212,255,0.4)]"
+            className="group relative mt-12 px-12 py-4 rounded-full font-bold text-lg overflow-hidden shadow-[0_0_40px_rgba(36,80,255,0.4)]"
             whileHover={{ scale: 1.06 }}
             whileTap={{ scale: 0.96 }}
         >
             <motion.span
                 className="absolute inset-0"
                 style={{
-                    background: 'linear-gradient(90deg, #00d4ff, #b84cff, #39ff73, #00d4ff)',
+                    background: 'linear-gradient(90deg, #2450FF, #7B9CFF, #5B7BFF, #2450FF)',
                     backgroundSize: '300% 100%',
                 }}
                 animate={{ backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'] }}
                 transition={{ duration: 5, repeat: Infinity, ease: 'linear' }}
             />
-            <span className="relative z-10 tracking-wide">{children}</span>
+            <span className="relative z-10 tracking-wide" style={{ color: '#ffffff' }}>{children}</span>
             <span className="absolute inset-0 -translate-x-full group-hover:translate-x-0 transition-transform duration-700 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
         </motion.button>
     );
 };
 
-export const Home = ({ onStart }: HomeProps) => (
-    <div className="relative min-h-screen overflow-x-hidden">
-        <Aurora />
-        <Grid />
+export const Home = ({ onStart }: HomeProps) => {
+    return (
+        <div className="relative min-h-screen overflow-x-hidden">
+            {/* 背景：绿色渐变壁纸（单层，暗化内建到 background-image 叠加层） */}
+            <div
+                className="fixed inset-0 pointer-events-none"
+                style={{
+                    backgroundImage: 'linear-gradient(rgba(0,0,0,0.32), rgba(0,0,0,0.32)), url(/home-bg.jpg)',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                }}
+            />
 
         {/* 顶栏（Logo 由全局层提供，这里只放右侧联系图标） */}
-        <header className="fixed top-0 inset-x-0 z-30 flex items-center justify-end px-6 py-4">
+        <header className="fixed top-0 inset-x-0 z-30 flex items-center justify-end pl-6 pr-6 py-4">
             <motion.div
                 className="flex items-center gap-3"
                 initial={{ opacity: 0, y: -12 }}
@@ -241,4 +210,5 @@ export const Home = ({ onStart }: HomeProps) => (
             </motion.div>
         </section>
     </div>
-);
+    );
+};

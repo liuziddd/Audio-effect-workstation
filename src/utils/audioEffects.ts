@@ -36,36 +36,36 @@ const generateImpulseResponse = (decay: number, size: number, damping: number, p
     return buffer;
 };
 
-/** 从控制点生成 WaveShaper 曲线（Catmull-Rom 样条，采样 length 点，输入范围 -1..1） */
-const buildShaperCurve = (points: ShaperPoint[], length = 2048): Float32Array => {
+/** 从控制点生成 WaveShaper 曲线（线性分段插值，采样 length 点）。横轴 x 为输入电平(-1~+1)，纵轴 y 为输出电平(-1~+1)，控制点之间直线连接，直接决定不同输入电平映射到哪个输出电平；超出首尾点的输入取端点值（Web Audio 规范）。长度取奇数，保证信号 0 精确对应曲线中心 */
+const buildShaperCurve = (points: ShaperPoint[], length = 2049): Float32Array => {
     const pts = [...points].sort((a, b) => a.x - b.x);
     const n = pts.length;
+    const curve = new Float32Array(length);
     if (n === 0) {
         // 空曲线退化为直线（无失真）
-        const linear = new Float32Array(length);
-        for (let i = 0; i < length; i++) linear[i] = (i / (length - 1)) * 2 - 1;
-        return linear;
+        for (let i = 0; i < length; i++) curve[i] = (i / (length - 1)) * 2 - 1;
+        return curve;
     }
-    const xs = pts.map((p) => p.x);
-    const ys = pts.map((p) => p.y);
-    const curve = new Float32Array(length);
     for (let i = 0; i < length; i++) {
         const x = (i / (length - 1)) * 2 - 1;
+        // 曲线两端之外延伸端点值（Web Audio 对 curve 范围外信号取端点值）
+        if (x <= pts[0].x) {
+            curve[i] = pts[0].y;
+            continue;
+        }
+        if (x >= pts[n - 1].x) {
+            curve[i] = pts[n - 1].y;
+            continue;
+        }
+        // 找到 x 所在区间，做线性插值
         let seg = 0;
-        while (seg < n - 1 && x > xs[seg + 1]) seg++;
-        const p0 = Math.max(0, seg - 1);
-        const p1 = seg;
-        const p2 = Math.min(n - 1, seg + 1);
-        const p3 = Math.min(n - 1, seg + 2);
-        const t = (x - xs[p1]) / (xs[p2] - xs[p1] || 1);
-        const tt = t * t;
-        const y = 0.5 * (
-            (2 * ys[p1]) +
-            (-ys[p0] + ys[p2]) * t +
-            (2 * ys[p0] - 5 * ys[p1] + 4 * ys[p2] - ys[p3]) * tt +
-            (-ys[p0] + 3 * ys[p1] - 3 * ys[p2] + ys[p3]) * tt * t
-        );
-        curve[i] = Math.max(-1, Math.min(1, y));
+        while (seg < n - 2 && x > pts[seg + 1].x) seg++;
+        const x0 = pts[seg].x;
+        const y0 = pts[seg].y;
+        const x1 = pts[seg + 1].x;
+        const y1 = pts[seg + 1].y;
+        const t = (x - x0) / (x1 - x0);
+        curve[i] = y0 + t * (y1 - y0);
     }
     return curve;
 };
@@ -293,41 +293,33 @@ const createModule = (config: EffectConfig): EffectModule => {
         }
 
         case 'distortion': {
-            // FL WaveShaper 风格：drive → 可编辑波形整形曲线 → output → 低通 → 干湿混合
+            // 纯正失真：drive（输入增益）→ WaveShaper（输入电平→输出电平的非线性映射曲线）→ output → 低通，全程串联无干湿
             const drive = new Tone.Gain(Tone.dbToGain(p.drive ?? 0));
             const shaper = new Tone.WaveShaper(buildShaperCurve(config.shaperPoints ?? []));
             shaper.oversample = oversampleType(p.oversample);
             const outputGain = new Tone.Gain(Tone.dbToGain(p.output ?? 0));
-            const tone = new Tone.Filter(p.tone ?? 10000, 'lowpass');
-            const mix = wetDry(p.mix ?? 0.5);
-            mix.input.connect(drive);
+            const tone = new Tone.Filter(p.tone ?? 20000, 'lowpass');
             drive.connect(shaper);
             shaper.connect(outputGain);
             outputGain.connect(tone);
-            tone.connect(mix.wet);
             return {
-                input: mix.input,
-                output: mix.output,
+                input: drive,
+                output: tone,
                 update(config) {
                     const params = config.parameters;
                     if (params.drive !== undefined) drive.gain.rampTo(Tone.dbToGain(params.drive), PARAMETER_RAMP_TIME);
                     if (params.output !== undefined) outputGain.gain.rampTo(Tone.dbToGain(params.output), PARAMETER_RAMP_TIME);
                     if (params.tone !== undefined) tone.frequency.rampTo(params.tone, PARAMETER_RAMP_TIME);
-                    if (params.mix !== undefined) mix.setMix(params.mix);
                     if (params.oversample !== undefined) shaper.oversample = oversampleType(params.oversample);
                     if (config.shaperPoints !== undefined) shaper.curve = buildShaperCurve(config.shaperPoints);
                 },
                 dispose() {
-                    mix.input.disconnect();
-                    mix.output.disconnect();
+                    drive.disconnect();
+                    tone.disconnect();
                     drive.dispose();
                     shaper.dispose();
                     outputGain.dispose();
                     tone.dispose();
-                    mix.wet.dispose();
-                    mix.dry.dispose();
-                    mix.input.dispose();
-                    mix.output.dispose();
                 },
             };
         }
@@ -487,8 +479,7 @@ export class AudioEffectsProcessor {
                     entry.module.update(config);
                     entry.config = config;
                 }
-            } catch (error) {
-                console.error(`无法创建或更新效果器 ${config.type}:`, error);
+            } catch {
                 this.removeEffect(config.id);
                 chainDirty = true;
             }

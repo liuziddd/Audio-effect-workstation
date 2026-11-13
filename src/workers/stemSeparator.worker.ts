@@ -16,8 +16,7 @@ type WorkerResponse =
     | { type: 'device'; gpu: boolean; isolated: boolean }
     | { type: 'status'; phase: 'init' | 'separate' | 'done'; text: string }
     | { type: 'progress'; progress: number }
-    | { type: 'done'; result: Record<string, { left: Float32Array; right: Float32Array }> }
-    | { type: 'error'; message: string };
+    | { type: 'done'; result: Record<string, { left: Float32Array; right: Float32Array }> };
 
 const post = (message: WorkerResponse) => self.postMessage(message);
 
@@ -83,14 +82,9 @@ self.addEventListener('message', async (event: MessageEvent<WorkerRequest>) => {
     const { type, left, right, modelBuffer } = event.data;
     if (type !== 'separate') return;
 
-    try {
-        const processor = await getProcessor(modelBuffer);
-        post({ type: 'status', phase: 'separate', text: '正在分离音轨' });
-        const result = await processor.separate(left, right);
-        post({ type: 'status', phase: 'done', text: '分离完成' });
-        post({ type: 'done', result });
-    } catch (error) {
-        processorPromise = null; // 允许失败后重试
-        post({ type: 'error', message: error instanceof Error ? error.message : String(error) });
-    }
+    const processor = await getProcessor(modelBuffer);
+    post({ type: 'status', phase: 'separate', text: '正在分离音轨' });
+    const result = await processor.separate(left, right);
+    post({ type: 'status', phase: 'done', text: '分离完成' });
+    post({ type: 'done', result });
 });

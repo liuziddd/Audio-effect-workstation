@@ -24,7 +24,7 @@ export interface EqBandData {
     q: number;
 }
 
-/** 失真波形整形曲线控制点：x 为输入(-1..1)，y 为输出(-1..1) */
+/** 失真波形整形曲线控制点：x 为输入电平(-1~+1)，y 为输出电平(-1~+1)。默认对角线 y=x 无失真，曲线偏离对角线即改变输入→输出的电平映射，产生削波失真 */
 export interface ShaperPoint {
     x: number;
     y: number;

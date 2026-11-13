@@ -9,18 +9,19 @@
 .inspector-dropzone {
     display: block;
     padding: 14px;
-    border: 1px dashed rgba(0, 212, 255, 0.4);
+    border: 1px dashed rgba(36, 80, 255, 0.4);
     border-radius: 10px;
-    background: rgba(0, 212, 255, 0.04);
-    color: #e2e8f0;
+    background: rgba(36, 80, 255, 0.04);
+    color: var(--text);
     text-align: center;
     cursor: pointer;
     transition: all 0.2s ease;
 }
 
-.inspector-dropzone:hover {
-    border-color: #00d4ff;
-    background: rgba(0, 212, 255, 0.1);
+.inspector-dropzone:hover,
+.inspector-dropzone.drag-over {
+    border-color: #2450FF;
+    background: rgba(36, 80, 255, 0.16);
 }
 
 .inspector-dropzone input {
@@ -30,7 +31,7 @@
 .inspector-hint {
     margin: 0;
     font-size: 0.82em;
-    color: #64748b;
+    color: var(--text-faint);
     line-height: 1.5;
 }
 
@@ -45,7 +46,44 @@
     margin: 0 0 10px;
     font-size: 0.9em;
     font-weight: 600;
-    color: #38bdf8;
+    color: #2450FF;
+}
+
+.music-features {
+    display: flex;
+    gap: 12px;
+}
+
+.music-feature {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 16px 10px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.music-feature-value {
+    font-family: 'Cascadia Code', Consolas, monospace;
+    font-size: 2em;
+    font-weight: 700;
+    line-height: 1;
+    color: #A6FF00;
+}
+
+.music-feature-value.key {
+    color: #5B7BFF;
+    font-size: 1.5em;
+    white-space: nowrap;
+}
+
+.music-feature-label {
+    font-size: 0.78em;
+    color: var(--text-faint);
 }
 
 .spec-table {
@@ -71,7 +109,7 @@
 
 .spec-table td:last-child {
     font-family: 'Cascadia Code', Consolas, monospace;
-    color: #e2e8f0;
+    color: var(--text);
     word-break: break-all;
 }
 
@@ -84,9 +122,9 @@
 }
 
 .inspector-message.ok {
-    background: rgba(16, 185, 129, 0.12);
-    border: 1px solid rgba(16, 185, 129, 0.5);
-    color: #34d399;
+    background: rgba(36, 80, 255, 0.12);
+    border: 1px solid rgba(36, 80, 255, 0.5);
+    color: #5B7BFF;
 }
 
 .inspector-message.bad {
@@ -96,9 +134,9 @@
 }
 
 .inspector-message.info {
-    background: rgba(56, 189, 248, 0.12);
-    border: 1px solid rgba(56, 189, 248, 0.5);
-    color: #38bdf8;
+    background: rgba(36, 80, 255, 0.12);
+    border: 1px solid rgba(36, 80, 255, 0.5);
+    color: #2450FF;
 }
 
 .audio-inspector audio {
@@ -162,7 +200,7 @@
     padding: 8px 10px;
     border-radius: 8px;
     background: rgba(255, 255, 255, 0.02);
-    border-left: 3px solid rgba(255, 255, 255, 0.12);
+    border-left: 3px solid var(--border-strong);
 }
 
 .eval-head {
@@ -175,7 +213,7 @@
 .eval-label {
     font-size: 0.88em;
     font-weight: 600;
-    color: #e2e8f0;
+    color: var(--text);
 }
 
 .eval-value {
@@ -205,15 +243,15 @@
 }
 
 .format-item.ok {
-    background: rgba(16, 185, 129, 0.15);
-    border: 1px solid #10b981;
-    color: #34d399;
+    background: rgba(36, 80, 255, 0.15);
+    border: 1px solid #2450FF;
+    color: #5B7BFF;
 }
 
 .format-item.warn {
-    background: rgba(245, 158, 11, 0.15);
-    border: 1px solid #f59e0b;
-    color: #fbbf24;
+    background: rgba(156, 163, 175, 0.15);
+    border: 1px solid #9CA3AF;
+    color: #9CA3AF;
 }
 
 .format-item.bad {

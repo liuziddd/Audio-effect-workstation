@@ -243,8 +243,7 @@ export const useAudioWithEffects = (): UseAudioWithEffectsReturn => {
             setCurrentTime(0);
             setIsLoaded(true);
             setIsPlaying(false);
-        } catch (error) {
-            console.error('音频加载失败:', error);
+        } catch {
             clearAllResources();
         }
     }, [clearAllResources]);
@@ -257,8 +256,7 @@ export const useAudioWithEffects = (): UseAudioWithEffectsReturn => {
             if (Tone.context.state !== 'running') await Tone.start();
             const startPosition = positionRef.current >= durationRef.current ? 0 : positionRef.current;
             startFromPosition(startPosition);
-        } catch (error) {
-            console.error('播放失败:', error);
+        } catch {
             isPlayingRef.current = false;
             setIsPlaying(false);
         } finally {
@@ -371,36 +369,31 @@ export const useAudioWithEffects = (): UseAudioWithEffectsReturn => {
         const sourceBuffer = audioBufferRef.current;
         if (!sourceBuffer) throw new Error('没有可导出的音频数据');
 
-        try {
-            const renderDuration = (durationRef.current || sourceBuffer.duration)
-                + getEffectsTailDuration(effects);
-            const toneAudioBuffer = await Tone.Offline(async () => {
-                const offlinePlayer = new Tone.Player(sourceBuffer);
-                const offlineProcessor = new AudioEffectsProcessor();
-                const offlineVolume = new Tone.Volume(Tone.gainToDb(volume));
-                const offlineLimiter = new Tone.Limiter(-1);
+        const renderDuration = (durationRef.current || sourceBuffer.duration)
+            + getEffectsTailDuration(effects);
+        const toneAudioBuffer = await Tone.Offline(async () => {
+            const offlinePlayer = new Tone.Player(sourceBuffer);
+            const offlineProcessor = new AudioEffectsProcessor();
+            const offlineVolume = new Tone.Volume(Tone.gainToDb(volume));
+            const offlineLimiter = new Tone.Limiter(-1);
 
-                offlinePlayer.connect(offlineProcessor.getInput());
-                offlineProcessor.connect(offlineVolume);
-                offlineVolume.connect(offlineLimiter);
-                offlineLimiter.toDestination();
-                offlineProcessor.updateEffectsChain(effects);
-                await offlineProcessor.ready();
-                offlinePlayer.start(0);
-            }, renderDuration);
+            offlinePlayer.connect(offlineProcessor.getInput());
+            offlineProcessor.connect(offlineVolume);
+            offlineVolume.connect(offlineLimiter);
+            offlineLimiter.toDestination();
+            offlineProcessor.updateEffectsChain(effects);
+            await offlineProcessor.ready();
+            offlinePlayer.start(0);
+        }, renderDuration);
 
-            const renderedBuffer = toneAudioBuffer.get();
-            if (!renderedBuffer) throw new Error('无法获取渲染后的音频数据');
+        const renderedBuffer = toneAudioBuffer.get();
+        if (!renderedBuffer) throw new Error('无法获取渲染后的音频数据');
 
-            const customName = filename?.trim();
-            const outputName = customName
-                ? (/\.wav$/i.test(customName) ? customName : `${customName}.wav`)
-                : `audio_export_${Date.now()}.wav`;
-            exportWAV(renderedBuffer, outputName);
-        } catch (error) {
-            console.error('音频导出失败:', error);
-            throw error;
-        }
+        const customName = filename?.trim();
+        const outputName = customName
+            ? (/\.wav$/i.test(customName) ? customName : `${customName}.wav`)
+            : `audio_export_${Date.now()}.wav`;
+        exportWAV(renderedBuffer, outputName);
     }, [effects, volume]);
 
     return {

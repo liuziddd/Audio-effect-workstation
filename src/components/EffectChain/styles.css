@@ -1,13 +1,13 @@
 /* 效果器链主容器：高度随效果器数量自然延长，不做内部滚动 */
 .effect-chain {
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-    border: 1px solid #2a2d3a;
+    background: linear-gradient(135deg, var(--surface) 0%, var(--surface) 100%);
+    border: 1px solid var(--surface-2);
     border-radius: 16px;
     padding: 24px;
     box-shadow: 
         0 8px 32px rgba(0, 0, 0, 0.4),
         0 2px 8px rgba(0, 0, 0, 0.2),
-        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        inset 0 1px 0 var(--border);
 }
 
 .effect-chain-header {
@@ -19,10 +19,10 @@
 
 .effect-chain-header h3 {
     margin: 0;
-    color: #00d4ff;
+    color: #2450FF;
     font-weight: 600;
     font-size: 1.3em;
-    text-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
+    text-shadow: 0 0 10px rgba(36, 80, 255, 0.3);
 }
 
 .chain-info {
@@ -32,22 +32,22 @@
 }
 
 .effect-count {
-    background: rgba(0, 212, 255, 0.1);
-    border: 1px solid rgba(0, 212, 255, 0.3);
+    background: rgba(36, 80, 255, 0.1);
+    border: 1px solid rgba(36, 80, 255, 0.3);
     border-radius: 8px;
     padding: 4px 12px;
-    color: #00d4ff;
+    color: #2450FF;
     font-size: 0.85em;
     font-weight: 500;
 }
 
 /* 拖拽效果器到链时的目标高亮 */
-.effect-chain.drop-target {
-    border-color: #00d4ff;
+[data-effect-dropzone].drop-active {
+    border-color: #2450FF !important;
     box-shadow:
         0 8px 32px rgba(0, 0, 0, 0.4),
-        0 0 0 2px rgba(0, 212, 255, 0.4),
-        0 0 40px rgba(0, 212, 255, 0.25);
+        0 0 0 2px rgba(36, 80, 255, 0.45),
+        0 0 36px rgba(36, 80, 255, 0.22) !important;
 }
 
 /* 空状态 */
@@ -65,13 +65,13 @@
 }
 
 .empty-state h3 {
-    color: #a0a0a0;
+    color: var(--text-muted);
     margin: 0 0 8px 0;
     font-size: 1.2em;
 }
 
 .empty-state p {
-    color: #707070;
+    color: var(--text-faint);
     margin: 0;
     font-size: 0.9em;
     line-height: 1.4;
@@ -86,12 +86,13 @@
 
 /* 单个效果器项目 */
 .effect-item {
-    background: linear-gradient(135deg, #2a2d3a 0%, #1e1e30 100%);
-    border: 1px solid #3a3d4a;
+    background: linear-gradient(135deg, var(--surface-2) 0%, var(--surface) 100%);
+    border: 1px solid var(--surface-3);
     border-radius: 10px;
-    padding: 8px 10px;
+    padding: 5px 10px;
     position: relative;
     overflow: hidden;
+    transition: opacity 0.25s ease, filter 0.25s ease;
 }
 
 .effect-item::before {
@@ -101,7 +102,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: linear-gradient(135deg, rgba(0, 212, 255, 0.05) 0%, rgba(138, 43, 226, 0.05) 100%);
+    background: linear-gradient(135deg, rgba(36, 80, 255, 0.05) 0%, rgba(36, 80, 255, 0.05) 100%);
     opacity: 0;
     transition: opacity 0.3s ease;
     pointer-events: none;
@@ -112,113 +113,114 @@
 }
 
 .effect-item.disabled {
-    opacity: 0.5;
+    opacity: 0.55;
+    filter: saturate(0.4);
 }
 
-/* 效果器头部 */
+/* 效果器头部：除按钮外均可拖拽 */
 .effect-header {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     position: relative;
     z-index: 1;
-}
-
-.effect-drag-handle {
     cursor: grab;
-    padding: 6px 4px;
-    border-radius: 6px;
-    transition: background-color 0.2s ease;
     user-select: none;
     touch-action: none;
 }
 
-.effect-drag-handle:hover {
-    background: rgba(255, 255, 255, 0.1);
-}
-
-.effect-drag-handle:active {
+.effect-header:active {
     cursor: grabbing;
-}
-
-.drag-icon {
-    color: #a0a0a0;
-    font-size: 1.2em;
-    font-weight: bold;
-    letter-spacing: -2px;
 }
 
 .effect-info {
     display: flex;
-    align-items: center;
-    gap: 10px;
+    align-items: baseline;
+    gap: 8px;
     flex: 1;
-}
-
-.effect-icon {
-    font-size: 1.25em;
-}
-
-.effect-details {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-.effect-name {
-    color: #ffffff;
-    font-weight: 600;
-    font-size: 1em;
+    min-width: 0;
 }
 
 .effect-index {
-    color: #a0a0a0;
-    font-size: 0.8em;
-    font-weight: 500;
+    color: #7B9CFF;
+    font-size: 0.78em;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.effect-name {
+    color: var(--text);
+    font-weight: 600;
+    font-size: 0.95em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* 效果器控制按钮 */
 .effect-controls {
     display: flex;
-    gap: 8px;
+    gap: 6px;
+    cursor: default;
 }
 
 .control-btn {
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 7px;
-    padding: 6px;
+    background: var(--border);
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    padding: 5px;
     cursor: pointer;
     transition: all 0.2s ease;
-    font-size: 0.95em;
+    font-size: 0.9em;
     display: flex;
     align-items: center;
     justify-content: center;
-    min-width: 30px;
-    height: 30px;
+    min-width: 26px;
+    height: 26px;
+    color: var(--text-muted);
 }
 
 .control-btn:hover {
-    background: rgba(255, 255, 255, 0.2);
+    background: var(--border-strong);
     transform: translateY(-1px);
 }
 
 .control-btn.active {
-    background: rgba(0, 212, 255, 0.2);
-    border-color: #00d4ff;
-    box-shadow: 0 0 12px rgba(0, 212, 255, 0.3);
+    background: rgba(59, 130, 246, 0.85);
+    border-color: #7B9CFF;
+    color: #ffffff;
+    box-shadow: 0 0 14px rgba(59, 130, 246, 0.5);
+}
+
+/* 电源开关：关闭态整体暗（开启态沿用 .control-btn.active 的点亮），另增强发光 */
+.power-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: var(--border);
+    color: var(--text-muted);
+}
+
+.power-btn:hover {
+    background: var(--border-strong);
+}
+
+.power-btn.active {
+    box-shadow: 0 0 16px rgba(59, 130, 246, 0.65), 0 0 4px rgba(123, 156, 255, 0.8);
+}
+
+.power-btn.active:hover {
+    background: rgba(59, 130, 246, 1);
 }
 
 .remove-btn:hover {
     background: rgba(255, 69, 58, 0.2);
     border-color: #ff4539;
+    color: #ff6b5e;
 }
 
 /* 效果器参数控制 */
 .effect-parameters {
-    margin-top: 10px;
-    padding-top: 10px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 10px 0 4px;
+    border-top: 1px solid var(--border);
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -245,7 +247,7 @@
 
 .knob-label {
     font-size: 10px;
-    color: #8a8f9d;
+    color: var(--text-muted);
     text-align: center;
     white-space: nowrap;
     max-width: 56px;
@@ -256,7 +258,7 @@
 .knob-value {
     font-size: 10px;
     font-family: 'Courier New', monospace;
-    color: #00d4ff;
+    color: #2450FF;
     font-weight: 600;
     line-height: 1;
 }
@@ -275,9 +277,9 @@
 }
 
 .parameter-select {
-    background: #181a26;
-    border: 1px solid #2a2e3d;
-    color: #ffffff;
+    background: var(--surface-2);
+    border: 1px solid var(--surface-2);
+    color: var(--text);
     border-radius: 8px;
     padding: 8px 12px;
     font-size: 0.9em;
@@ -287,7 +289,7 @@
 }
 
 .parameter-select:hover {
-    border-color: #00d4ff;
+    border-color: #2450FF;
 }
 
 /* EQ 图形化 */
@@ -308,7 +310,7 @@
 .eq-hint {
     margin: 0;
     font-size: 0.75em;
-    color: #5b6172;
+    color: var(--text-faint);
     text-align: center;
 }
 
@@ -323,9 +325,9 @@
 }
 
 .eq-type {
-    background: #181a26;
-    border: 1px solid #2a2e3d;
-    color: #ffffff;
+    background: var(--surface-2);
+    border: 1px solid var(--surface-2);
+    color: var(--text);
     border-radius: 6px;
     padding: 5px 6px;
     font-size: 12px;
@@ -335,7 +337,7 @@
 }
 
 .eq-type:hover {
-    border-color: #00d4ff;
+    border-color: #2450FF;
 }
 
 .eq-field {
@@ -348,7 +350,7 @@
 
 .eq-field span {
     font-size: 11px;
-    color: #8a8f9d;
+    color: var(--text-muted);
     white-space: nowrap;
 }
 
@@ -376,17 +378,17 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    color: #ffffff;
+    color: var(--text);
     font-size: 0.9em;
     font-weight: 500;
     text-transform: capitalize;
 }
 
 .parameter-value {
-    color: #00d4ff;
+    color: #2450FF;
     font-family: 'Courier New', monospace;
     font-weight: 600;
-    background: rgba(0, 212, 255, 0.1);
+    background: rgba(36, 80, 255, 0.1);
     padding: 2px 8px;
     border-radius: 4px;
 }
@@ -395,7 +397,7 @@
     -webkit-appearance: none;
     appearance: none;
     height: 6px;
-    background: linear-gradient(to right, #3a3d4a 0%, #2a2d3a 100%);
+    background: linear-gradient(to right, var(--surface-3) 0%, var(--surface-2) 100%);
     border-radius: 3px;
     outline: none;
     transition: all 0.2s ease;
@@ -406,7 +408,7 @@
     appearance: none;
     width: 18px;
     height: 18px;
-    background: linear-gradient(135deg, #00d4ff 0%, #8a2be2 100%);
+    background: linear-gradient(135deg, #2450FF 0%, #2450FF 100%);
     border-radius: 50%;
     cursor: pointer;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
@@ -415,13 +417,13 @@
 
 .parameter-slider::-webkit-slider-thumb:hover {
     transform: scale(1.1);
-    box-shadow: 0 0 15px rgba(0, 212, 255, 0.4);
+    box-shadow: 0 0 15px rgba(36, 80, 255, 0.4);
 }
 
 .parameter-slider::-moz-range-thumb {
     width: 18px;
     height: 18px;
-    background: linear-gradient(135deg, #00d4ff 0%, #8a2be2 100%);
+    background: linear-gradient(135deg, #2450FF 0%, #2450FF 100%);
     border-radius: 50%;
     cursor: pointer;
     border: none;
@@ -431,7 +433,7 @@
 
 .parameter-slider::-moz-range-thumb:hover {
     transform: scale(1.1);
-    box-shadow: 0 0 15px rgba(0, 212, 255, 0.4);
+    box-shadow: 0 0 15px rgba(36, 80, 255, 0.4);
 }
 
 /* 响应式设计 */

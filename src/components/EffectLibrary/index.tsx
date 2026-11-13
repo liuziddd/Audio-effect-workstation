@@ -1,4 +1,5 @@
 import { EffectType } from '../../types/audio';
+import { startEffectDrag, shouldSuppressEffectClick } from '../../utils/effectDrag';
 import './styles.css';
 
 interface EffectLibraryProps {
@@ -25,41 +26,45 @@ const effectsLibrary: EffectInfo[] = [
 ];
 
 const CATEGORY_COLORS: Record<string, string> = {
-    空间效果: '#00d4ff',
-    滤波器: '#b84cff',
-    动态处理: '#ff9f43',
-    时间效果: '#39ff73',
-    调制效果: '#ff5ecf',
-    失真: '#ff5252',
+    空间效果: '#2450FF',
+    滤波器: '#3D5BFF',
+    动态处理: '#9CA3AF',
+    时间效果: '#A6FF00',
+    调制效果: '#5B7BFF',
+    失真: '#FF3B30',
 };
 
 const categories = Array.from(new Set(effectsLibrary.map((e) => e.category)));
 
+/** 判断颜色亮度，决定其上文字用深色还是白色（浅色背景配深字，深色背景配白字） */
+const isLight = (hex: string) => {
+    const n = parseInt(hex.replace('#', ''), 16);
+    if (Number.isNaN(n)) return false;
+    const r = (n >> 16) & 255;
+    const g = (n >> 8) & 255;
+    const b = n & 255;
+    return (r * 299 + g * 587 + b * 114) / 1000 > 150;
+};
+
 export const EffectLibrary: React.FC<EffectLibraryProps> = ({ onAddEffect }) => (
     <div className="effect-library-sidebar">
-        {categories.map((category, ci) => {
-            const color = CATEGORY_COLORS[category] ?? '#00d4ff';
+        {categories.map((category) => {
+            const color = CATEGORY_COLORS[category] ?? '#2450FF';
             const items = effectsLibrary.filter((e) => e.category === category);
             return (
                 <div key={category} className="effect-category">
                     <h4 style={{ color }}>{category}</h4>
                     <div className="library-list">
-                        {items.map((effect, i) => (
+                        {items.map((effect) => (
                             <button
                                 key={effect.type}
                                 className="effect-button"
-                                draggable
-                                onDragStart={(e) => {
-                                    e.dataTransfer.setData('application/x-effect-type', effect.type);
-                                    e.dataTransfer.effectAllowed = 'copy';
-                                }}
-                                onClick={() => onAddEffect(effect.type)}
+                                onPointerDown={(e) => startEffectDrag(e, { type: effect.type, name: effect.name, color }, onAddEffect)}
+                                onClick={() => { if (!shouldSuppressEffectClick()) onAddEffect(effect.type); }}
                                 title={`${effect.name}（点击或拖拽到效果器链）`}
-                                style={{ '--accent': color, animationDelay: `${ci * 0.05 + i * 0.03}s` } as React.CSSProperties}
+                                style={{ background: color, color: isLight(color) ? '#15161d' : '#ffffff' }}
                             >
-                                <span className="effect-accent" />
-                                <span className="effect-name">{effect.name}</span>
-                                <span className="effect-arrow">›</span>
+                                {effect.name}
                             </button>
                         ))}
                     </div>

@@ -66,10 +66,9 @@ export const effectParameterDefinitions: Record<EffectType, Record<string, Effec
         mix: { min: 0, max: 1, step: 0.01, default: 0.5, unit: '', label: '干湿比' },
     },
     distortion: {
-        drive: { min: -24, max: 24, step: 0.5, default: 0, unit: 'dB', label: '驱动' },
+        drive: { min: -24, max: 24, step: 0.5, default: 6, unit: 'dB', label: '驱动' },
         output: { min: -24, max: 24, step: 0.5, default: 0, unit: 'dB', label: '输出' },
-        tone: { min: 100, max: 20000, step: 100, default: 10000, unit: 'Hz', label: '音色（低通）', control: 'slider' },
-        mix: { min: 0, max: 1, step: 0.01, default: 0.5, unit: '', label: '干湿比' },
+        tone: { min: 100, max: 20000, step: 100, default: 20000, unit: 'Hz', label: '音色（低通）', control: 'slider' },
         oversample: { min: 0, max: 4, step: 2, default: 4, unit: 'x', label: '过采样' },
     },
     filter: {
@@ -117,176 +116,40 @@ export const createDefaultEqBands = (): EqBandData[] => [
     { id: newEqBandId(), type: 'highshelf', freq: 8000, gain: 0, q: 0.707 },
 ];
 
-/** 失真波形整形默认曲线：首尾端点固定(-1,-1)/(1,1)，中间两点构成轻微软削波 */
+/** 失真波形整形默认曲线：标准软削波——中心段(-0.5~+0.5)斜率 1.4 放大、两端斜率 0.6 压缩趋于饱和（类 tanh），配合 drive 增益把信号推进非线性区 */
 export const createDefaultShaperPoints = (): ShaperPoint[] => [
     { x: -1, y: -1 },
-    { x: -0.5, y: -0.35 },
+    { x: -0.5, y: -0.7 },
     { x: 0, y: 0 },
-    { x: 0.5, y: 0.35 },
+    { x: 0.5, y: 0.7 },
     { x: 1, y: 1 },
 ];
 
-// 检查浏览器对音频格式的支持
-export const checkAudioSupport = () => {
-    const audio = new Audio();
-    const support = {
-        mp3: !!(audio.canPlayType && audio.canPlayType('audio/mpeg').replace(/no/, '')),
-        wav: !!(audio.canPlayType && audio.canPlayType('audio/wav').replace(/no/, '')),
-        ogg: !!(audio.canPlayType && audio.canPlayType('audio/ogg').replace(/no/, '')),
-        aac: !!(audio.canPlayType && audio.canPlayType('audio/aac').replace(/no/, '')),
-        m4a: !!(audio.canPlayType && audio.canPlayType('audio/mp4').replace(/no/, '')),
-        webm: !!(audio.canPlayType && audio.canPlayType('audio/webm').replace(/no/, '')),
-        flac: !!(audio.canPlayType && audio.canPlayType('audio/flac').replace(/no/, ''))
-    };
-
-    console.log('🔍 浏览器音频格式支持:', support);
-    return support;
-};
-
-// 从文件名获取扩展名
-export const getFileExtension = (filename: string): string => {
-    return filename.split('.').pop()?.toLowerCase() || '';
-};
-
-// 验证音频文件
-export const validateAudioFile = (file: File): { valid: boolean; error?: string; suggestion?: string } => {
-    const maxSize = 50 * 1024 * 1024; // 50MB
-
-    // 检查文件大小
-    if (file.size > maxSize) {
-        return {
-            valid: false,
-            error: `文件太大 (${(file.size / 1024 / 1024).toFixed(1)}MB)，最大支持50MB`
-        };
-    }
-
-    // 检查文件扩展名
-    const extension = getFileExtension(file.name);
-    const supportedExtensions = ['mp3', 'wav', 'ogg', 'aac', 'm4a', 'webm', 'flac'];
-
-    if (!supportedExtensions.includes(extension)) {
-        return {
-            valid: false,
-            error: `不支持的文件格式: .${extension}`,
-            suggestion: `请使用以下格式: ${supportedExtensions.join(', ')}`
-        };
-    }
-
-    // 检查MIME类型
-    const supportedMimeTypes = [
-        'audio/mpeg',     // MP3 (标准)
-        'audio/mp3',      // MP3 (备用)
-        'audio/x-mpeg',   // MP3 (备用)
-        'audio/mpeg3',    // MP3 (备用)
-        'audio/wav',      // WAV
-        'audio/wave',     // WAV (备用)
-        'audio/x-wav',    // WAV (备用)
-        'audio/ogg',      // OGG
-        'audio/ogg; codecs="vorbis"', // OGG Vorbis
-        'audio/mp4',      // M4A/AAC
-        'audio/aac',      // AAC
-        'audio/x-aac',    // AAC (备用)
-        'audio/webm',     // WebM
-        'audio/webm; codecs="vorbis"', // WebM Vorbis
-        'audio/flac',     // FLAC
-        'audio/x-flac'    // FLAC (备用)
-    ];
-
-    // 如果MIME类型不在支持列表中，但扩展名支持，仍然尝试加载
-    if (!supportedMimeTypes.includes(file.type) && file.type !== '') {
-        console.warn(`⚠️ MIME类型 "${file.type}" 可能不被支持，但将尝试按扩展名 ".${extension}" 处理`);
-    }
-
-    return { valid: true };
+// 验证音频文件：大小 ≤ 50MB 且扩展名在支持列表内
+export const validateAudioFile = (file: File): boolean => {
+    const extension = file.name.split('.').pop()?.toLowerCase() || '';
+    return file.size <= 50 * 1024 * 1024 &&
+        ['mp3', 'wav', 'ogg', 'aac', 'm4a', 'webm', 'flac'].includes(extension);
 };
 
 // 检测音频文件的实际可播放性
-export const testAudioPlayability = (file: File): Promise<{ playable: boolean; error?: string; duration?: number }> => {
-    return new Promise((resolve) => {
+export const testAudioPlayability = (file: File): Promise<boolean> =>
+    new Promise((resolve) => {
         const url = URL.createObjectURL(file);
         const audio = new Audio();
-
         let resolved = false;
 
-        const cleanup = () => {
-            if (!resolved) {
-                resolved = true;
-                URL.revokeObjectURL(url);
-            }
+        const done = (playable: boolean) => {
+            if (resolved) return;
+            resolved = true;
+            URL.revokeObjectURL(url);
+            resolve(playable);
         };
 
-        // 成功加载
-        audio.addEventListener('loadedmetadata', () => {
-            cleanup();
-            console.log('🎵 音频可播放性测试成功:', {
-                '文件名': file.name,
-                '时长': audio.duration,
-                '采样率': '未知', // HTML audio元素无法直接获取采样率
-                'readyState': audio.readyState,
-                'networkState': audio.networkState
-            });
+        audio.addEventListener('loadedmetadata', () => done(true), { once: true });
+        audio.addEventListener('error', () => done(false), { once: true });
+        setTimeout(() => done(false), 10000);
 
-            // 确保时长是有效的数字
-            const validDuration = audio.duration && isFinite(audio.duration) && audio.duration > 0
-                ? audio.duration
-                : 0;
-
-            resolve({
-                playable: true,
-                duration: validDuration
-            });
-        }, { once: true });
-
-        // 加载失败
-        audio.addEventListener('error', () => {
-            cleanup();
-            const error = audio.error;
-            let errorMessage = '未知错误';
-
-            if (error) {
-                switch (error.code) {
-                    case MediaError.MEDIA_ERR_ABORTED:
-                        errorMessage = '播放被中止';
-                        break;
-                    case MediaError.MEDIA_ERR_NETWORK:
-                        errorMessage = '网络错误';
-                        break;
-                    case MediaError.MEDIA_ERR_DECODE:
-                        errorMessage = '音频解码失败，文件可能损坏或格式不受支持';
-                        break;
-                    case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
-                        errorMessage = '音频格式不受浏览器支持';
-                        break;
-                }
-            }
-
-            console.error('❌ 音频可播放性测试失败:', {
-                '文件名': file.name,
-                '错误代码': error?.code,
-                '错误信息': errorMessage
-            });
-
-            resolve({
-                playable: false,
-                error: errorMessage
-            });
-        }, { once: true });
-
-        // 超时处理
-        setTimeout(() => {
-            if (!resolved) {
-                cleanup();
-                console.warn('⏰ 音频可播放性测试超时:', file.name);
-                resolve({
-                    playable: false,
-                    error: '音频加载超时'
-                });
-            }
-        }, 10000);
-
-        // 开始加载
         audio.src = url;
         audio.preload = 'metadata';
-        console.log('🧪 开始测试音频可播放性:', file.name);
-    });
-}; 
+    }); 

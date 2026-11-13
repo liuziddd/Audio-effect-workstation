@@ -48,7 +48,7 @@ export const Knob: React.FC<KnobProps> = ({
     onChange,
     label,
     unit = '',
-    color = '#00d4ff',
+    color = '#2450FF',
     size = 44,
 }) => {
     const drag = useRef<{ startY: number; startValue: number } | null>(null);
@@ -102,7 +102,7 @@ export const Knob: React.FC<KnobProps> = ({
         >
             <svg viewBox="0 0 100 100" width={size} height={size}>
                 {/* 外围光柱底环 */}
-                <path d={arc(cx, cy, arcR, START, END)} stroke="#262a38" strokeWidth={6} fill="none" strokeLinecap="round" />
+                <path d={arc(cx, cy, arcR, START, END)} stroke="var(--surface-3)" strokeWidth={6} fill="none" strokeLinecap="round" />
                 {/* 当前值光柱 */}
                 {value > min && (
                     <path
@@ -115,8 +115,8 @@ export const Knob: React.FC<KnobProps> = ({
                     />
                 )}
                 {/* 旋钮盘 */}
-                <circle cx={cx} cy={cy} r={knobR} fill="#181a26" stroke="#2a2e3d" strokeWidth={1.5} />
-                <circle cx={cx} cy={cy} r={knobR * 0.68} fill="#202331" stroke="#262a38" strokeWidth={1} />
+                <circle cx={cx} cy={cy} r={knobR} fill="var(--surface-2)" stroke="var(--surface-2)" strokeWidth={1.5} />
+                <circle cx={cx} cy={cy} r={knobR * 0.68} fill="var(--surface-2)" stroke="var(--surface-3)" strokeWidth={1} />
                 {/* 箭标 */}
                 <g transform={`rotate(${angle} ${cx} ${cy})`}>
                     <line x1={cx} y1={cy - knobR * 0.55} x2={cx} y2={cy - knobR + 3} stroke={color} strokeWidth={2.5} strokeLinecap="round" />

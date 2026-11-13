@@ -1,6 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { AudioFile } from '../../types/audio';
+import { dragBridge } from '../../utils/dragBridge';
+import { HorizontalGauge } from '../UI/HorizontalGauge';
 import './styles.css';
 
 interface AudioControls {
@@ -43,20 +45,10 @@ export const SimpleAudioPlayer: React.FC<SimpleAudioPlayerProps> = ({
     onClearAudio,
     onReplaceFile,
 }) => {
-    const isSeekingRef = React.useRef(false);
-    const seekTimeRef = React.useRef(0);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const progressRef = useRef<HTMLDivElement>(null);
+    const seekingRef = useRef(false);
     const [isDragOver, setIsDragOver] = useState(false);
-
-    const finishSeek = (event: React.PointerEvent<HTMLInputElement>) => {
-        if (!controls || !isSeekingRef.current) return;
-        seekTimeRef.current = Number(event.currentTarget.value);
-        isSeekingRef.current = false;
-        controls.seek(seekTimeRef.current);
-        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-            event.currentTarget.releasePointerCapture(event.pointerId);
-        }
-    };
 
     const pickFile = () => fileInputRef.current?.click();
 
@@ -70,7 +62,7 @@ export const SimpleAudioPlayer: React.FC<SimpleAudioPlayerProps> = ({
         event.preventDefault();
         event.stopPropagation();
         setIsDragOver(false);
-        const file = Array.from(event.dataTransfer.files).find(isAudioFile);
+        const file = Array.from(event.dataTransfer.files).find(isAudioFile) ?? dragBridge.peek();
         if (file) onReplaceFile?.(file);
     };
 
@@ -93,6 +85,38 @@ export const SimpleAudioPlayer: React.FC<SimpleAudioPlayerProps> = ({
 
     const displayDuration = controls?.duration || audioFile.duration || 0;
     const displayCurrentTime = controls?.currentTime || 0;
+    const progressRatio = displayDuration > 0 ? Math.min(1, Math.max(0, displayCurrentTime / displayDuration)) : 0;
+
+    // 根据指针 x 坐标换算为播放时间（0 ~ duration）
+    const timeFromClientX = (clientX: number) => {
+        const el = progressRef.current;
+        if (!el || !displayDuration) return 0;
+        const rect = el.getBoundingClientRect();
+        const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+        return ratio * displayDuration;
+    };
+
+    const onProgressPointerDown = (e: React.PointerEvent) => {
+        if (!controls?.isLoaded) return;
+        seekingRef.current = true;
+        controls.beginSeek();
+        controls.previewSeek(timeFromClientX(e.clientX));
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    };
+
+    const onProgressPointerMove = (e: React.PointerEvent) => {
+        if (!seekingRef.current || !controls) return;
+        controls.previewSeek(timeFromClientX(e.clientX));
+    };
+
+    const onProgressPointerUp = (e: React.PointerEvent) => {
+        if (!seekingRef.current || !controls) return;
+        seekingRef.current = false;
+        controls.seek(timeFromClientX(e.clientX));
+        if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+            (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+        }
+    };
 
     return (
         <motion.div
@@ -175,48 +199,27 @@ export const SimpleAudioPlayer: React.FC<SimpleAudioPlayerProps> = ({
                         )}
                     </div>
 
-                    {/* 进度条 */}
+                    {/* 进度条：CallChip 风格胶囊 + 从左侧擦过的填充层 */}
                     <div className="progress-section">
                         <span className="time-display current-time">
                             {formatTime(displayCurrentTime)}
                         </span>
 
-                        <div className="progress-bar-container">
-                            <input
-                                type="range"
-                                min={0}
-                                max={displayDuration || 0}
-                                value={displayCurrentTime}
-                                step={0.01}
-                                onPointerDown={(event) => {
-                                    if (!controls.isLoaded) return;
-                                    isSeekingRef.current = true;
-                                    seekTimeRef.current = controls.currentTime;
-                                    event.currentTarget.setPointerCapture(event.pointerId);
-                                    controls.beginSeek();
-                                }}
-                                onChange={(event) => {
-                                    const time = Number(event.target.value);
-                                    seekTimeRef.current = time;
-                                    if (isSeekingRef.current) {
-                                        controls.previewSeek(time);
-                                    } else {
-                                        controls.seek(time);
-                                    }
-                                }}
-                                onPointerUp={finishSeek}
-                                onPointerCancel={finishSeek}
-                                onLostPointerCapture={() => {
-                                    if (isSeekingRef.current) {
-                                        isSeekingRef.current = false;
-                                        controls.seek(seekTimeRef.current);
-                                    }
-                                }}
-                                disabled={!controls.isLoaded}
-                                className="progress-bar"
-                                aria-label="音频播放进度控制"
-                                title="拖动调整播放位置"
-                            />
+                        <div
+                            ref={progressRef}
+                            className="progress-track"
+                            onPointerDown={onProgressPointerDown}
+                            onPointerMove={onProgressPointerMove}
+                            onPointerUp={onProgressPointerUp}
+                            onPointerCancel={onProgressPointerUp}
+                            role="slider"
+                            aria-label="音频播放进度控制"
+                            aria-valuemin={0}
+                            aria-valuemax={Math.round(displayDuration)}
+                            aria-valuenow={Math.round(displayCurrentTime)}
+                            title="拖动调整播放位置"
+                        >
+                            <span className="progress-fill" style={{ transform: `scaleX(${progressRatio})` }} />
                         </div>
 
                         <span className="time-display total-time">
@@ -224,19 +227,18 @@ export const SimpleAudioPlayer: React.FC<SimpleAudioPlayerProps> = ({
                         </span>
                     </div>
 
-                    {/* 音量控制 */}
+                    {/* 音量控制：横版液体 gauge（细长） */}
                     <div className="volume-section">
                         <span className="volume-icon">🔊</span>
-                        <input
-                            type="range"
-                            min={0}
-                            max={1}
-                            step={0.01}
-                            value={controls.volume}
-                            onChange={(e) => controls.setVolume(parseFloat(e.target.value))}
-                            className="volume-slider"
-                            aria-label="音量控制"
-                            title="调整播放音量"
+                        <HorizontalGauge
+                            value={Math.round(controls.volume * 100)}
+                            onChange={(v) => controls.setVolume(v / 100)}
+                            liquidColor="var(--accent)"
+                            glassColor="var(--surface-3)"
+                            width={180}
+                            height={16}
+                            radius={8}
+                            ariaLabel="音量控制"
                         />
                         <span className="volume-display">
                             {Math.round(controls.volume * 100)}%

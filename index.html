@@ -1,22 +1,18 @@
 <!doctype html>
-<html lang="zh-CN" class="dark">
+<html lang="zh-CN">
 
 <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>音频效果工作站 | Audio Effects Studio</title>
-    <meta name="description" content="专业的Web音频效果处理工作站，支持混响、EQ、压缩、镶边等多种效果器" />
-    <style>
-        /* 防止页面闪烁 */
-        body {
-            background-color: #0a0a0a;
-            color: #ffffff;
-        }
-    </style>
+    <meta name="description" content="在线音频效果处理工作站：实时效果器链、AI 音轨分离、自动母带与离线导出" />
+    <script>
+        // 提前读取主题偏好，避免首屏闪烁
+        document.documentElement.classList.add(localStorage.getItem('aew-theme') === 'light' ? 'light' : 'dark');
+    </script>
 </head>
 
-<body class="bg-dark-bg text-white overflow-hidden">
+<body class="overflow-hidden">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
 </body>

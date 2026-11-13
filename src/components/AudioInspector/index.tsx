@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { analyzeAudio, evaluateAudio } from '../../utils/audioAnalysis';
 import type { AnalysisResult, Evaluation, Grade } from '../../utils/audioAnalysis';
+import { dragBridge } from '../../utils/dragBridge';
 import { WaveformView, SpectrumView } from './Visualizations';
 import './styles.css';
 
@@ -34,9 +35,9 @@ const FORMATS: [string, string][] = [
 ];
 
 const GRADE_META: Record<Grade, { text: string; color: string }> = {
-    good: { text: '优秀', color: '#34d399' },
-    ok: { text: '良好', color: '#38bdf8' },
-    warn: { text: '需注意', color: '#fbbf24' },
+    good: { text: '优秀', color: '#5B7BFF' },
+    ok: { text: '良好', color: '#2450FF' },
+    warn: { text: '需注意', color: '#9CA3AF' },
     bad: { text: '问题', color: '#f87171' },
 };
 
@@ -101,6 +102,7 @@ export const AudioInspector = () => {
     const [previewUrl, setPreviewUrl] = useState('');
     const [formats, setFormats] = useState<{ name: string; level: 'ok' | 'warn' | 'bad' }[]>([]);
     const objectUrlRef = useRef<string | null>(null);
+    const [isDragOver, setIsDragOver] = useState(false);
 
     useEffect(() => {
         const probe = new Audio();
@@ -196,11 +198,24 @@ export const AudioInspector = () => {
             audio.preload = 'metadata';
         });
 
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragOver(false);
+        const file = Array.from(e.dataTransfer.files)[0] ?? dragBridge.peek();
+        if (file) handleFile(file);
+    };
+
     return (
         <div className="audio-inspector">
-            <label className="inspector-dropzone">
+            <label
+                className={`inspector-dropzone${isDragOver ? ' drag-over' : ''}`}
+                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragOver(true); }}
+                onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDragOver(false); }}
+                onDrop={handleDrop}
+            >
                 <input type="file" accept="audio/*" onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
-                选择音频文件进行检测
+                拖拽音频文件到此处，或点击选择
             </label>
             <p className="inspector-hint">解析文件规格、波形/频谱、专业指标（响度/动态/削波/相位）并做播放测试，文件仅在本地处理。</p>
 
@@ -208,6 +223,28 @@ export const AudioInspector = () => {
 
             {analysis && spec && (
                 <>
+                    <div className="inspector-card">
+                        <h4>音乐特征</h4>
+                        <div className="music-features">
+                            <div className="music-feature">
+                                <span className="music-feature-value">
+                                    {analysis.metrics.bpm !== null ? Math.round(analysis.metrics.bpm) : '—'}
+                                </span>
+                                <span className="music-feature-label">BPM（节拍速度）</span>
+                            </div>
+                            <div className="music-feature">
+                                <span className="music-feature-value key">
+                                    {analysis.metrics.key ? analysis.metrics.key.key : '—'}
+                                </span>
+                                <span className="music-feature-label">
+                                    {analysis.metrics.key
+                                        ? `调性 · 置信度 ${Math.round(analysis.metrics.key.confidence * 100)}%`
+                                        : '调性'}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
                     <div className="inspector-card">
                         <h4>波形</h4>
                         <WaveformView peaks={analysis.peaks} channels={analysis.metrics.channels} />

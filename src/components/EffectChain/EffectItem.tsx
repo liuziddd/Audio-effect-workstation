@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Reorder, useDragControls } from 'framer-motion';
+import { Reorder, useDragControls, AnimatePresence, motion } from 'framer-motion';
+import { Power, ChevronDown, ChevronUp } from 'lucide-react';
 import { EffectConfig, EffectType, EqBandData, ShaperPoint } from '../../types/audio';
 import { effectParameterDefinitions } from '../../utils/audioUtils';
 import { Knob } from '../UI/Knob';
@@ -17,29 +18,16 @@ interface EffectItemProps {
     onUpdateShaperPoints: (points: ShaperPoint[]) => void;
 }
 
-const effectIcons: Record<EffectType, string> = {
-    reverb: '🌊',
-    eq: '📊',
-    compressor: '📈',
-    delay: '⏰',
-    chorus: '🎵',
-    phaser: '🌀',
-    distortion: '⚡',
-    filter: '🔽',
-    limiter: '🚫',
-    gate: '🚪',
-};
-
 const effectColors: Record<EffectType, string> = {
-    reverb: '#4facfe',
-    eq: '#39ff73',
-    compressor: '#ff6b35',
-    delay: '#b84cff',
-    chorus: '#00d4ff',
-    phaser: '#ff4fd8',
-    distortion: '#ff453a',
-    filter: '#00d4ff',
-    limiter: '#ffd60a',
+    reverb: '#7B9CFF',
+    eq: '#3D5BFF',
+    compressor: '#9CA3AF',
+    delay: '#A6FF00',
+    chorus: '#2450FF',
+    phaser: '#7B9CFF',
+    distortion: '#FF3B30',
+    filter: '#2450FF',
+    limiter: '#A6FF00',
     gate: '#8a8f9d',
 };
 
@@ -70,39 +58,33 @@ export const EffectItem: React.FC<EffectItemProps> = ({
             whileDrag={{
                 scale: 1.02,
                 zIndex: 1000,
-                boxShadow: '0 12px 35px rgba(0, 0, 0, 0.6), 0 0 30px rgba(0, 212, 255, 0.3)',
+                boxShadow: '0 12px 35px rgba(0, 0, 0, 0.6), 0 0 30px rgba(36, 80, 255, 0.3)',
             }}
             transition={{ type: 'spring', stiffness: 500, damping: 40 }}
             className={`effect-item ${!effect.enabled ? 'disabled' : ''}`}
             style={{ position: 'relative' }}
         >
-            <div className="effect-header">
-                <div className="effect-drag-handle" onPointerDown={(e) => dragControls.start(e)}>
-                    <span className="drag-icon">⋮⋮</span>
-                </div>
-
+            {/* 头部：未展开时的全部区域，除按钮外均可拖拽 */}
+            <div className="effect-header" onPointerDown={(e) => dragControls.start(e)}>
                 <div className="effect-info">
-                    <span className="effect-icon">{effectIcons[effect.type]}</span>
-                    <div className="effect-details">
-                        <span className="effect-name">{effect.name}</span>
-                        <span className="effect-index">#{index + 1}</span>
-                    </div>
+                    <span className="effect-index">#{index + 1}</span>
+                    <span className="effect-name">{effect.name}</span>
                 </div>
 
-                <div className="effect-controls">
+                <div className="effect-controls" onPointerDown={(e) => e.stopPropagation()}>
                     <button
                         className={`control-btn power-btn ${effect.enabled ? 'active' : ''}`}
                         onClick={onToggle}
                         title={effect.enabled ? '关闭效果器' : '开启效果器'}
                     >
-                        ⚡
+                        <Power className="w-4 h-4" />
                     </button>
                     <button
                         className={`control-btn expand-btn ${isExpanded ? 'active' : ''}`}
                         onClick={() => setIsExpanded(!isExpanded)}
                         title={isExpanded ? '收起参数' : '展开参数'}
                     >
-                        ⚙️
+                        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                     </button>
                     <button className="control-btn remove-btn" onClick={onRemove} title="删除效果器">
                         🗑️
@@ -110,105 +92,116 @@ export const EffectItem: React.FC<EffectItemProps> = ({
                 </div>
             </div>
 
-            {isExpanded && (
-                <div className="effect-parameters">
-                    {effect.type === 'eq' && (
-                        <EqGraph
-                            bands={effect.eqBands ?? []}
-                            onChange={onUpdateEqBands}
-                        />
-                    )}
-                    {effect.type === 'distortion' && (
-                        <ShaperGraph
-                            points={effect.shaperPoints ?? []}
-                            onChange={onUpdateShaperPoints}
-                        />
-                    )}
-                    {effect.type === 'compressor' && (
-                        <DynamicsGraph
-                            threshold={effect.parameters.threshold ?? -18}
-                            ratio={effect.parameters.ratio ?? 3}
-                            knee={effect.parameters.knee ?? 12}
-                            color={effectColors.compressor}
-                        />
-                    )}
-                    {effect.type === 'limiter' && (
-                        <DynamicsGraph
-                            threshold={effect.parameters.threshold ?? -3}
-                            ratio={20}
-                            knee={0}
-                            color={effectColors.limiter}
-                        />
-                    )}
-
-                    {effect.type !== 'eq' && (
-                        <>
-                            {knobParams.length > 0 && (
-                                <div className="knob-grid">
-                                    {knobParams.map(([name, cfg]) => (
-                                        <Knob
-                                            key={name}
-                                            value={effect.parameters[name] ?? cfg.default}
-                                            min={cfg.min}
-                                            max={cfg.max}
-                                            step={cfg.step}
-                                            defaultValue={cfg.default}
-                                            onChange={(v) => setParam(name, v)}
-                                            label={cfg.label}
-                                            unit={cfg.unit}
-                                            color={effectColors[effect.type]}
-                                        />
-                                    ))}
-                                </div>
+            {/* 展开参数：高度渐显动画 */}
+            <AnimatePresence initial={false}>
+                {isExpanded && (
+                    <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ height: { duration: 0.3, ease: [0.4, 0, 0.2, 1] }, opacity: { duration: 0.22 } }}
+                        style={{ overflow: 'hidden' }}
+                    >
+                        <div className="effect-parameters">
+                            {effect.type === 'eq' && (
+                                <EqGraph
+                                    bands={effect.eqBands ?? []}
+                                    onChange={onUpdateEqBands}
+                                />
                             )}
-                            {otherParams.length > 0 && (
-                                <div className="param-list">
-                                    {otherParams.map(([name, cfg]) => {
-                                        const currentValue = effect.parameters[name] ?? cfg.default;
-                                        if (cfg.control === 'select') {
-                                            return (
-                                                <div key={name} className="parameter-control">
-                                                    <label className="parameter-label">{cfg.label}</label>
-                                                    <select
-                                                        className="parameter-select"
-                                                        value={currentValue}
-                                                        onChange={(e) => setParam(name, parseInt(e.target.value, 10))}
-                                                    >
-                                                        {cfg.options?.map((opt, i) => (
-                                                            <option key={i} value={i}>
-                                                                {opt}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                </div>
-                                            );
-                                        }
-                                        return (
-                                            <div key={name} className="parameter-control">
-                                                <label className="parameter-label">
-                                                    {cfg.label}
-                                                    <span className="parameter-value">
-                                                        {currentValue.toFixed(cfg.step < 1 ? 1 : 0)}{cfg.unit}
-                                                    </span>
-                                                </label>
-                                                <input
-                                                    type="range"
+                            {effect.type === 'distortion' && (
+                                <ShaperGraph
+                                    points={effect.shaperPoints ?? []}
+                                    onChange={onUpdateShaperPoints}
+                                />
+                            )}
+                            {effect.type === 'compressor' && (
+                                <DynamicsGraph
+                                    threshold={effect.parameters.threshold ?? -18}
+                                    ratio={effect.parameters.ratio ?? 3}
+                                    knee={effect.parameters.knee ?? 12}
+                                    color={effectColors.compressor}
+                                />
+                            )}
+                            {effect.type === 'limiter' && (
+                                <DynamicsGraph
+                                    threshold={effect.parameters.threshold ?? -3}
+                                    ratio={20}
+                                    knee={0}
+                                    color={effectColors.limiter}
+                                />
+                            )}
+
+                            {effect.type !== 'eq' && (
+                                <>
+                                    {knobParams.length > 0 && (
+                                        <div className="knob-grid">
+                                            {knobParams.map(([name, cfg]) => (
+                                                <Knob
+                                                    key={name}
+                                                    value={effect.parameters[name] ?? cfg.default}
                                                     min={cfg.min}
                                                     max={cfg.max}
                                                     step={cfg.step}
-                                                    value={currentValue}
-                                                    onChange={(e) => setParam(name, parseFloat(e.target.value))}
-                                                    className="parameter-slider"
+                                                    defaultValue={cfg.default}
+                                                    onChange={(v) => setParam(name, v)}
+                                                    label={cfg.label}
+                                                    unit={cfg.unit}
+                                                    color={effectColors[effect.type]}
                                                 />
-                                            </div>
-                                        );
-                                    })}
-                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {otherParams.length > 0 && (
+                                        <div className="param-list">
+                                            {otherParams.map(([name, cfg]) => {
+                                                const currentValue = effect.parameters[name] ?? cfg.default;
+                                                if (cfg.control === 'select') {
+                                                    return (
+                                                        <div key={name} className="parameter-control">
+                                                            <label className="parameter-label">{cfg.label}</label>
+                                                            <select
+                                                                className="parameter-select"
+                                                                value={currentValue}
+                                                                onChange={(e) => setParam(name, parseInt(e.target.value, 10))}
+                                                            >
+                                                                {cfg.options?.map((opt, i) => (
+                                                                    <option key={i} value={i}>
+                                                                        {opt}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+                                                        </div>
+                                                    );
+                                                }
+                                                return (
+                                                    <div key={name} className="parameter-control">
+                                                        <label className="parameter-label">
+                                                            {cfg.label}
+                                                            <span className="parameter-value">
+                                                                {currentValue.toFixed(cfg.step < 1 ? 1 : 0)}{cfg.unit}
+                                                            </span>
+                                                        </label>
+                                                        <input
+                                                            type="range"
+                                                            min={cfg.min}
+                                                            max={cfg.max}
+                                                            step={cfg.step}
+                                                            value={currentValue}
+                                                            onChange={(e) => setParam(name, parseFloat(e.target.value))}
+                                                            className="parameter-slider"
+                                                        />
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </>
                             )}
-                        </>
-                    )}
-                </div>
-            )}
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </Reorder.Item>
     );
 };

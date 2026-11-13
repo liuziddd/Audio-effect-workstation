@@ -1,14 +1,16 @@
 .effect-library-sidebar {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 14px;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: 2px 14px 2px 2px;
+    padding: 2px 12px 2px 2px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(36, 80, 255, 0.25) transparent;
 }
 
 .effect-category h4 {
-    margin: 0 0 6px;
+    margin: 0 0 7px;
     font-size: 0.72em;
     font-weight: 600;
     text-transform: uppercase;
@@ -19,105 +21,34 @@
 .library-list {
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: 6px;
 }
 
-/* 效果器卡片：实心深色底，无玻璃透明效果 */
+/* 效果器卡片：最简单的纯色圆角条 */
 .effect-button {
-    position: relative;
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 10px 12px;
-    border: 1px solid #383c4a;
-    border-radius: 9px;
-    background: #212430;
+    padding: 10px 14px;
+    border: none;
+    border-radius: 12px;
+    font-size: 0.9em;
+    font-weight: 600;
+    letter-spacing: 0.3px;
     cursor: grab;
     text-align: left;
-    overflow: hidden;
-    opacity: 0;
-    animation: fb-fade-in 0.4s ease forwards;
-    transition: transform 0.24s cubic-bezier(0.34, 1.56, 0.64, 1),
-        border-color 0.2s ease,
-        background 0.2s ease,
-        box-shadow 0.24s ease;
+    touch-action: none;
+    user-select: none;
+    transition: opacity 0.15s ease, transform 0.15s ease;
 }
 
-@keyframes fb-fade-in {
-    to {
-        opacity: 1;
-    }
+.effect-button:hover {
+    opacity: 0.86;
+    transform: translateY(-1px);
 }
 
 .effect-button:active {
     cursor: grabbing;
-    transform: translateX(8px) scale(1.02);
-}
-
-/* 左侧类别色条 */
-.effect-accent {
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 3px;
-    background: var(--accent, #00d4ff);
-    opacity: 0.45;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* 悬停光晕 */
-.effect-button::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(90deg, var(--accent, #00d4ff) 0%, transparent 60%);
-    opacity: 0;
-    transition: opacity 0.25s ease;
-    pointer-events: none;
-}
-
-/* 抽签式：悬停的卡片抽出、浮起、放大，压过相邻卡片 */
-.effect-button:hover {
-    transform: translateX(8px) scale(1.03);
-    z-index: 10;
-    border-color: var(--accent, #00d4ff);
-    background: #2b2f42;
-    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6), 0 0 20px color-mix(in srgb, var(--accent, #00d4ff) 40%, transparent);
-}
-
-.effect-button:hover::after {
-    opacity: 0.1;
-}
-
-.effect-button:hover .effect-accent {
-    opacity: 1;
-    width: 5px;
-    box-shadow: 0 0 10px var(--accent, #00d4ff);
-}
-
-.effect-name {
-    flex: 1;
-    color: #e2e8f0;
-    font-size: 0.86em;
-    font-weight: 500;
-    letter-spacing: 0.3px;
-    transition: color 0.2s ease;
-}
-
-.effect-button:hover .effect-name {
-    color: #ffffff;
-}
-
-.effect-arrow {
-    color: #475569;
-    font-size: 1em;
-    transition: all 0.2s ease;
-}
-
-.effect-button:hover .effect-arrow {
-    color: var(--accent, #00d4ff);
-    transform: translateX(3px);
+    opacity: 0.75;
 }
 
 .effect-library-sidebar::-webkit-scrollbar {
@@ -125,15 +56,10 @@
 }
 
 .effect-library-sidebar::-webkit-scrollbar-thumb {
-    background: rgba(0, 212, 255, 0.25);
+    background: rgba(36, 80, 255, 0.25);
     border-radius: 3px;
 }
 
 .effect-library-sidebar::-webkit-scrollbar-thumb:hover {
-    background: rgba(0, 212, 255, 0.45);
-}
-
-.effect-library-sidebar {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(0, 212, 255, 0.25) transparent;
+    background: rgba(36, 80, 255, 0.45);
 }

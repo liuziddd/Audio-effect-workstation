@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
+import { dragBridge } from '../../utils/dragBridge';
 import './styles.css';
 
 interface AudioEntry {
@@ -9,14 +10,9 @@ interface AudioEntry {
 
 const AUDIO_RE = /\.(mp3|wav|ogg|m4a|aac|flac|webm|mp4)$/i;
 
-interface FileBrowserProps {
-    onLoadFile: (file: File) => void;
-}
-
-export const FileBrowser = ({ onLoadFile }: FileBrowserProps) => {
+export const FileBrowser = () => {
     const [entries, setEntries] = useState<AudioEntry[]>([]);
     const [dirName, setDirName] = useState('');
-    const [message, setMessage] = useState('');
     const dirHandleRef = useRef<FileSystemDirectoryHandle | null>(null);
     const supported = typeof (window as any).showDirectoryPicker === 'function';
 
@@ -29,38 +25,36 @@ export const FileBrowser = ({ onLoadFile }: FileBrowserProps) => {
         }
         list.sort((a, b) => a.name.localeCompare(b.name));
         setEntries(list);
-        // 并行预取 File 对象，供拖拽携带真实文件
         await Promise.all(list.map(async (item) => {
-            try { item.file = await item.handle.getFile(); } catch { /* 忽略单个文件失败 */ }
+            item.file = await item.handle.getFile();
         }));
         setEntries([...list]);
     }, []);
 
     const pickDirectory = async () => {
-        try {
-            const handle = await (window as any).showDirectoryPicker();
-            dirHandleRef.current = handle;
-            setDirName(handle.name);
-            setMessage('');
-            await scanDir(handle);
-        } catch (error) {
-            if ((error as any)?.name !== 'AbortError') {
-                setMessage('无法访问该文件夹，请重试或换一个文件夹。');
-            }
-        }
+        const handle = await (window as any).showDirectoryPicker();
+        dirHandleRef.current = handle;
+        setDirName(handle.name);
+        await scanDir(handle);
     };
 
     const refresh = async () => {
         if (!dirHandleRef.current) return;
-        setMessage('');
         await scanDir(dirHandleRef.current);
     };
 
     const handleDragStart = (e: React.DragEvent, entry: AudioEntry) => {
         if (!entry.file) return;
+        // 真实文件通过内存桥接暂存（dataTransfer 无法传递 File System Access API 的 File）
+        dragBridge.set(entry.file);
+        // 附带文件名作为拖拽标识，供上传区读取提示
         e.dataTransfer.setData('application/x-audio-name', entry.name);
-        try { e.dataTransfer.items.add(entry.file); } catch { /* 某些环境不支持 items.add */ }
         e.dataTransfer.effectAllowed = 'copy';
+    };
+
+    const handleDragEnd = () => {
+        // drop 事件先于 dragend 触发；用微任务延迟清除，确保上传区已读走文件
+        setTimeout(() => dragBridge.clear(), 0);
     };
 
     if (!supported) {
@@ -82,8 +76,6 @@ export const FileBrowser = ({ onLoadFile }: FileBrowserProps) => {
                 {dirName && <button className="fb-btn ghost" onClick={refresh}>↻ 刷新</button>}
             </div>
 
-            {message && <p className="fb-message">{message}</p>}
-
             {entries.length > 0 && (
                 <ul className="fb-list">
                     {entries.map((entry) => (
@@ -92,8 +84,8 @@ export const FileBrowser = ({ onLoadFile }: FileBrowserProps) => {
                             className="fb-item"
                             draggable={!!entry.file}
                             onDragStart={(e) => handleDragStart(e, entry)}
-                            onClick={() => entry.file && onLoadFile(entry.file)}
-                            title={`${entry.name}（点击加载 / 拖拽到中间）`}
+                            onDragEnd={handleDragEnd}
+                            title={`${entry.name}（拖拽到上传区域加载）`}
                         >
                             <span className="fb-icon">🎵</span>
                             <span className="fb-name">{entry.name}</span>
@@ -102,12 +94,12 @@ export const FileBrowser = ({ onLoadFile }: FileBrowserProps) => {
                 </ul>
             )}
 
-            {dirName && entries.length === 0 && !message && (
+            {dirName && entries.length === 0 && (
                 <p className="fb-empty">该文件夹内没有可用的音频文件。</p>
             )}
 
             {!dirName && (
-                <p className="fb-hint">选择一个本地文件夹，即可浏览其中的音频文件，点击或拖拽到中间加载。</p>
+                <p className="fb-hint">选择一个本地文件夹，即可浏览其中的音频文件，拖拽到中间上传区域加载。</p>
             )}
         </div>
     );
