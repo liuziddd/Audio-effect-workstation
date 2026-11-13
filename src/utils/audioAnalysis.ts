@@ -2,6 +2,7 @@
  * 专业音频检测分析：波形峰值、频谱、电平/响度/削波/相位等指标，及专业评价。
  * 纯函数模块，不依赖 React，输入 AudioBuffer 输出结构化结果。
  */
+import { fft } from './fft';
 
 export interface WaveformPeaks {
     min: number;
@@ -11,11 +12,6 @@ export interface WaveformPeaks {
 export interface SpectrumBand {
     freq: number;   // 中心频率 Hz
     level: number;  // 幅值 dB
-}
-
-export interface KeyInfo {
-    key: string;               // 调性名称，如 "C 大调" / "A 小调"
-    confidence: number;        // 置信度 0~1
 }
 
 export interface AudioMetrics {
@@ -34,8 +30,6 @@ export interface AudioMetrics {
     spectralCentroid: number;  // 频谱质心 Hz
     leadSilenceMs: number;     // 开头静音时长 ms
     tailSilenceMs: number;     // 结尾静音时长 ms
-    bpm: number | null;        // 节拍速度 BPM（检测不到为 null）
-    key: KeyInfo | null;       // 调性（检测不到为 null）
 }
 
 export interface AnalysisResult {
@@ -69,43 +63,6 @@ const computePeaks = (data: Float32Array, buckets: number): WaveformPeaks[] => {
     return result;
 };
 
-/** 迭代 radix-2 FFT（就地），re 为实部，im 为虚部 */
-const fft = (re: Float32Array, im: Float32Array): void => {
-    const n = re.length;
-    for (let i = 1, j = 0; i < n; i++) {
-        let bit = n >> 1;
-        for (; j & bit; bit >>= 1) j ^= bit;
-        j ^= bit;
-        if (i < j) {
-            [re[i], re[j]] = [re[j], re[i]];
-            [im[i], im[j]] = [im[j], im[i]];
-        }
-    }
-    for (let len = 2; len <= n; len <<= 1) {
-        const ang = (-2 * Math.PI) / len;
-        const wRe = Math.cos(ang);
-        const wIm = Math.sin(ang);
-        for (let i = 0; i < n; i += len) {
-            let cr = 1;
-            let ci = 0;
-            const half = len >> 1;
-            for (let k = 0; k < half; k++) {
-                const uRe = re[i + k];
-                const uIm = im[i + k];
-                const vRe = re[i + k + half] * cr - im[i + k + half] * ci;
-                const vIm = re[i + k + half] * ci + im[i + k + half] * cr;
-                re[i + k] = uRe + vRe;
-                im[i + k] = uIm + vIm;
-                re[i + k + half] = uRe - vRe;
-                im[i + k + half] = uIm - vIm;
-                const nr = cr * wRe - ci * wIm;
-                ci = cr * wIm + ci * wRe;
-                cr = nr;
-            }
-        }
-    }
-};
-
 /** 对数频段频谱（FFT + Hann 窗 + 能量归并），并返回频谱质心 */
 const computeSpectrum = (mono: Float32Array, sampleRate: number) => {
     let n = 1;
@@ -115,7 +72,7 @@ const computeSpectrum = (mono: Float32Array, sampleRate: number) => {
     const im = new Float32Array(n);
     for (let i = 0; i < n; i++) {
         const w = 0.5 * (1 - Math.cos((2 * Math.PI * i) / n)); // Hann
-        re[i] = mono[i % mono.length] * w;
+        re[i] = i < mono.length ? mono[i] * w : 0;
     }
     fft(re, im);
 
@@ -277,143 +234,6 @@ const computeSilence = (data: Float32Array, fs: number, fromTail: boolean): numb
     return (count / fs) * 1000;
 };
 
-/* ------------------------- 节拍速度（BPM）检测 ------------------------- */
-
-/** 检测 BPM：能量包络正差分（onset 强度）的自相关峰值，60~200 BPM 范围内搜索 */
-const detectBpm = (mono: Float32Array, sampleRate: number): number | null => {
-    const frameRate = 172; // 包络帧率 Hz（约 256 样本/帧 @44.1k）
-    const hop = Math.max(1, Math.round(sampleRate / frameRate));
-    const frames = Math.floor(mono.length / hop);
-    if (frames < 200) return null; // 时长过短，不足以可靠检测
-
-    // 能量包络（每帧 RMS）
-    const envelope = new Float32Array(frames);
-    for (let f = 0; f < frames; f++) {
-        const start = f * hop;
-        let sum = 0;
-        for (let i = 0; i < hop; i++) {
-            const v = mono[start + i];
-            sum += v * v;
-        }
-        envelope[f] = Math.sqrt(sum / hop);
-    }
-
-    // onset 强度 = 包络正差分（能量上升处即节拍）
-    const onset = new Float32Array(frames - 1);
-    for (let i = 1; i < frames; i++) onset[i - 1] = Math.max(0, envelope[i] - envelope[i - 1]);
-
-    const n = onset.length;
-    const minBpm = 60;
-    const maxBpm = 200;
-    const minLag = Math.floor((60 * frameRate) / maxBpm);
-    const maxLag = Math.ceil((60 * frameRate) / minBpm);
-
-    // 自相关，稍偏向中速（120 BPM）以抑制 double/half tempo 误判
-    let bestLag = -1;
-    let bestScore = -Infinity;
-    for (let lag = minLag; lag <= maxLag; lag++) {
-        let corr = 0;
-        for (let i = 0; i < n - lag; i++) corr += onset[i] * onset[i + lag];
-        const bpm = (60 * frameRate) / lag;
-        const weight = 1 - Math.min(0.35, Math.abs(bpm - 120) / 400);
-        const score = corr * weight;
-        if (score > bestScore) {
-            bestScore = score;
-            bestLag = lag;
-        }
-    }
-    if (bestLag <= 0 || !isFinite(bestScore)) return null;
-    return Math.round(((60 * frameRate) / bestLag) * 10) / 10;
-};
-
-/* ------------------------- 调性（Key）检测 ------------------------- */
-
-const PITCH_CLASSES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-
-// Krumhansl-Kessler 大调/小调感知模板（12 个音级的典型稳定性）
-const MAJOR_PROFILE = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88];
-const MINOR_PROFILE = [6.33, 2.68, 3.52, 5.38, 2.6, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17];
-
-/** 检测调性：chroma（12 音级能量分布）+ Krumhansl-Kessler 相关性匹配，返回 24 个候选中最优 */
-const detectKey = (mono: Float32Array, sampleRate: number): KeyInfo | null => {
-    const frameSize = 4096;
-    // 帧数控制在 ~400 以内（均匀降采样），避免长音频耗时过长
-    let hopSize = 2048;
-    const maxFrames = 400;
-    const totalFrames = Math.floor((mono.length - frameSize) / hopSize) + 1;
-    if (totalFrames > maxFrames) hopSize = Math.floor((mono.length - frameSize) / maxFrames) + 1;
-
-    const chroma = new Float32Array(12);
-    const re = new Float32Array(frameSize);
-    const im = new Float32Array(frameSize);
-    const refFreq = 261.6256; // C4
-
-    let frameCount = 0;
-    for (let start = 0; start + frameSize <= mono.length; start += hopSize) {
-        for (let i = 0; i < frameSize; i++) {
-            const w = 0.5 * (1 - Math.cos((2 * Math.PI * i) / frameSize)); // Hann
-            re[i] = mono[start + i] * w;
-            im[i] = 0;
-        }
-        fft(re, im);
-        for (let i = 1; i < frameSize / 2; i++) {
-            const freq = (i * sampleRate) / frameSize;
-            if (freq < 60 || freq > 5000) continue; // 只统计基频主导频段
-            const mag = Math.sqrt(re[i] * re[i] + im[i] * im[i]);
-            const pc = Math.round(12 * Math.log2(freq / refFreq));
-            chroma[((pc % 12) + 12) % 12] += mag;
-        }
-        frameCount++;
-    }
-    if (frameCount === 0) return null;
-
-    // 模板旋转到某主音后与 chroma 做 Pearson 相关
-    const pearson = (shift: number, profile: number[]): number => {
-        let meanC = 0;
-        let meanR = 0;
-        for (let i = 0; i < 12; i++) {
-            meanC += chroma[i];
-            meanR += profile[(i - shift + 12) % 12];
-        }
-        meanC /= 12;
-        meanR /= 12;
-        let num = 0;
-        let denC = 0;
-        let denR = 0;
-        for (let i = 0; i < 12; i++) {
-            const dc = chroma[i] - meanC;
-            const dr = profile[(i - shift + 12) % 12] - meanR;
-            num += dc * dr;
-            denC += dc * dc;
-            denR += dr * dr;
-        }
-        return num / Math.sqrt(denC * denR || 1e-12);
-    };
-
-    let bestCorr = -Infinity;
-    let bestShift = 0;
-    let bestMajor = true;
-    for (let shift = 0; shift < 12; shift++) {
-        const cm = pearson(shift, MAJOR_PROFILE);
-        if (cm > bestCorr) {
-            bestCorr = cm;
-            bestShift = shift;
-            bestMajor = true;
-        }
-        const cn = pearson(shift, MINOR_PROFILE);
-        if (cn > bestCorr) {
-            bestCorr = cn;
-            bestShift = shift;
-            bestMajor = false;
-        }
-    }
-
-    const tonic = PITCH_CLASSES[bestShift];
-    const mode = bestMajor ? '大调' : '小调';
-    const confidence = Math.max(0, Math.min(1, (bestCorr + 1) / 2));
-    return { key: `${tonic} ${mode}`, confidence };
-};
-
 /** 综合分析：一次遍历得到全部指标 + 波形 + 频谱 */
 export const analyzeAudio = (buffer: AudioBuffer): AnalysisResult => {
     const channels = buffer.numberOfChannels;
@@ -476,8 +296,6 @@ export const analyzeAudio = (buffer: AudioBuffer): AnalysisResult => {
         spectralCentroid,
         leadSilenceMs: computeSilence(lead, buffer.sampleRate, false),
         tailSilenceMs: computeSilence(tail, buffer.sampleRate, true),
-        bpm: detectBpm(mono, buffer.sampleRate),
-        key: detectKey(mono, buffer.sampleRate),
     };
 
     return { metrics, peaks, spectrum };

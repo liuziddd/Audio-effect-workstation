@@ -1,9 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { analyzeAudio, evaluateAudio } from '../../utils/audioAnalysis';
 import type { AnalysisResult, Evaluation, Grade } from '../../utils/audioAnalysis';
+import MusicAnalysisWorker from '../../workers/musicAnalysis.worker?worker';
+import type { MusicAnalysis } from '../../utils/musicFeatures';
 import { dragBridge } from '../../utils/dragBridge';
 import { WaveformView, SpectrumView } from './Visualizations';
 import './styles.css';
+
+type MusicWorkerMessage =
+    | { type: 'stage'; progress: number; text: string }
+    | { type: 'done'; result: MusicAnalysis }
+    | { type: 'failed' };
 
 interface Spec {
     fileName: string;
@@ -93,6 +100,26 @@ const detectFormat = (bytes: Uint8Array, fileName: string) => {
 
 const formatMs = (ms: number) => (ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(2)} s`);
 
+const CHROMA_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+/** 12 音级归一化剖面：直观看出主音与调式音级分布 */
+const ChromaView = ({ chroma }: { chroma: number[] }) => {
+    const max = Math.max(...chroma, 1e-9);
+    return (
+        <div className="chroma-view">
+            {CHROMA_NAMES.map((name, i) => (
+                <div className="chroma-col" key={name}>
+                    <span
+                        className="chroma-bar"
+                        style={{ height: `${Math.max(4, (chroma[i] / max) * 100)}%` }}
+                    />
+                    <span className="chroma-label">{name}</span>
+                </div>
+            ))}
+        </div>
+    );
+};
+
 export const AudioInspector = () => {
     const [spec, setSpec] = useState<Spec | null>(null);
     const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
@@ -101,7 +128,11 @@ export const AudioInspector = () => {
     const [message, setMessage] = useState('');
     const [previewUrl, setPreviewUrl] = useState('');
     const [formats, setFormats] = useState<{ name: string; level: 'ok' | 'warn' | 'bad' }[]>([]);
+    const [music, setMusic] = useState<MusicAnalysis | null>(null);
+    const [musicBusy, setMusicBusy] = useState(false);
+    const [musicStatus, setMusicStatus] = useState('');
     const objectUrlRef = useRef<string | null>(null);
+    const musicWorkerRef = useRef<Worker | null>(null);
     const [isDragOver, setIsDragOver] = useState(false);
 
     useEffect(() => {
@@ -112,8 +143,50 @@ export const AudioInspector = () => {
         }));
         return () => {
             if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+            musicWorkerRef.current?.terminate();
         };
     }, []);
+
+    const analyzeMusicAsync = (buffer: AudioBuffer) => {
+        musicWorkerRef.current?.terminate();
+        const left = buffer.getChannelData(0).slice();
+        const right = (buffer.numberOfChannels > 1
+            ? buffer.getChannelData(1) : buffer.getChannelData(0)).slice();
+        const worker = new MusicAnalysisWorker();
+        musicWorkerRef.current = worker;
+        setMusic(null);
+        setMusicBusy(true);
+        setMusicStatus('正在分析节拍与调性…');
+
+        worker.onmessage = (event: MessageEvent<MusicWorkerMessage>) => {
+            if (musicWorkerRef.current !== worker) return;
+            const data = event.data;
+            if (data.type === 'stage') {
+                setMusicStatus(data.text);
+            } else if (data.type === 'done') {
+                setMusic(data.result);
+                setMusicBusy(false);
+                setMusicStatus('');
+                worker.terminate();
+                musicWorkerRef.current = null;
+            } else {
+                // 失败静默复位，不显示错误提示
+                setMusicBusy(false);
+                setMusicStatus('');
+                worker.terminate();
+                musicWorkerRef.current = null;
+            }
+        };
+        worker.onerror = () => {
+            setMusicBusy(false);
+            setMusicStatus('');
+            musicWorkerRef.current = null;
+        };
+        worker.postMessage(
+            { type: 'analyze', left, right, sampleRate: buffer.sampleRate },
+            [left.buffer, right.buffer],
+        );
+    };
 
     const handleFile = async (file: File) => {
         setMessage('解析中...');
@@ -121,6 +194,11 @@ export const AudioInspector = () => {
         setAnalysis(null);
         setEvaluation(null);
         setPlay(null);
+        setMusic(null);
+        setMusicBusy(false);
+        setMusicStatus('');
+        musicWorkerRef.current?.terminate();
+        musicWorkerRef.current = null;
 
         try {
             const [header, audioBuffer] = await Promise.all([
@@ -149,6 +227,7 @@ export const AudioInspector = () => {
             const result = analyzeAudio(audioBuffer);
             setAnalysis(result);
             setEvaluation(evaluateAudio(result.metrics));
+            analyzeMusicAsync(audioBuffer);
             setMessage('');
 
             const playResult = await testPlayback(file);
@@ -228,21 +307,50 @@ export const AudioInspector = () => {
                         <div className="music-features">
                             <div className="music-feature">
                                 <span className="music-feature-value">
-                                    {analysis.metrics.bpm !== null ? Math.round(analysis.metrics.bpm) : '—'}
+                                    {music && music.bpm !== null ? Math.round(music.bpm) : musicBusy ? '…' : '—'}
                                 </span>
-                                <span className="music-feature-label">BPM（节拍速度）</span>
+                                <span className="music-feature-label">
+                                    {music && music.bpm !== null
+                                        ? `BPM · 置信度 ${Math.round(music.bpmConfidence * 100)}%`
+                                        : 'BPM（节拍速度）'}
+                                </span>
                             </div>
                             <div className="music-feature">
                                 <span className="music-feature-value key">
-                                    {analysis.metrics.key ? analysis.metrics.key.key : '—'}
+                                    {music?.key ?? (musicBusy ? '…' : '—')}
                                 </span>
                                 <span className="music-feature-label">
-                                    {analysis.metrics.key
-                                        ? `调性 · 置信度 ${Math.round(analysis.metrics.key.confidence * 100)}%`
+                                    {music?.key
+                                        ? `调性 · 置信度 ${Math.round(music.keyConfidence * 100)}%`
                                         : '调性'}
                                 </span>
                             </div>
                         </div>
+
+                        {musicBusy && <p className="inspector-hint music-status">{musicStatus}</p>}
+
+                        {music && (music.bpmAlternatives.length > 0 || music.keyAlternatives.length > 0) && (
+                            <div className="music-alts">
+                                {music.bpmAlternatives.length > 0 && (
+                                    <span>备选速度：{music.bpmAlternatives.map((v) => Math.round(v)).join(' / ')} BPM</span>
+                                )}
+                                {music.keyAlternatives.length > 0 && (
+                                    <span>备选调性：{music.keyAlternatives.join(' / ')}</span>
+                                )}
+                            </div>
+                        )}
+
+                        {music && music.chroma.length === 12 && (
+                            <>
+                                <p className="inspector-hint music-status">12 音级能量剖面（HPCP）</p>
+                                <ChromaView chroma={music.chroma} />
+                            </>
+                        )}
+
+                        <p className="inspector-hint music-status">
+                            谱通量节拍检测 + HPCP 多模板调性分析；长音频取代表性片段，计算在独立线程完成。
+                            置信度为候选间相对间隔，不是准确率保证。
+                        </p>
                     </div>
 
                     <div className="inspector-card">
