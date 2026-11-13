@@ -1,18 +1,25 @@
 /**
  * ITO-Master 白盒母带链：6 模块（参量 EQ → 失真 → 3 段多频压缩 → 增益 → M/S 立体声 → 限制器）
  *
- * 移植自 Hugging Face Space `kramp/audio-master` 的 src/lib/ito_dsp.js
- * （1:1 复刻 dasp-pytorch 的 RBJ 双二阶、torchcomp 的压缩/限制器包络与
- *  ITO-Master 的 Linkwitz-Riley 分频），原工程与模型均为 CC BY-NC 4.0，仅限非商业使用。
- * 出处：https://huggingface.co/spaces/kramp/audio-master
- * 模型：Koo et al., ITO-Master (Sony Research, ISMIR 2025), CC BY-NC 4.0
+ * 结构移植自 HF Space `kramp/audio-master` 的 src/lib/ito_dsp.js，但有两点针对播放场景的修正：
+ *  1. 官方 port 自己也注明「训练时 EQ 走 FFT 频域采样（零相位），这里改成时域 IIR」。
+ *     单段 EQ 幅度等价，但 3 段分频再与干声并联时相位不等价，会叠出梳状滤波（镶边感）。
+ *     本实现的多频分频改为双向滤波（filtfilt），保持零相位。
+ *  2. 原参数范围服务于「可微分音色变换」而非母带：EQ ±20dB、压缩比 20:1、阈值 −60dB、
+ *     限制器 −60dB。中性输出就会压掉近 20dB，再由响度层放大回去，把谐波失真与相位伪影
+ *     一并放大。这里把 46 参数限制在母带常用幅度——模型仍决定 EQ 形状、分频点与压缩倾向，
+ *     但幅度受约束，使声压级变化很小、响度提升、音色平衡基本不变。
  *
- * 顺序与反归一化范围来自模型仓库 kramp/ito-master-onnx 的 config.json。
+ * 原工程与模型均为 CC BY-NC 4.0，仅限非商业使用。
+ * 出处：https://huggingface.co/spaces/kramp/audio-master
+ * 模型：Koo et al., ITO-Master (Sony Research, ISMIR 2025)
  */
 import { applyGain, type Stem } from './loudness';
 
 const EPS = 1e-6;
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+const MAX_GR_DB = 6;        // 单频段最大压缩量
+const BAND_BALANCE = 0.45;  // 频段增益向共同均值收缩后保留的差异比例
 
 type Coeffs = { b0: number; b1: number; b2: number; a1: number; a2: number };
 
@@ -66,6 +73,16 @@ function biquadInPlace(x: Float32Array, c: Coeffs) {
     }
 }
 
+/** 正向 + 反向双二阶：零相位，幅度为 |H|²（等效 4 阶 LR 斜率） */
+function biquadZeroPhase(x: Float32Array, c: Coeffs): Float32Array {
+    const y = x.slice();
+    biquadInPlace(y, c);
+    y.reverse();
+    biquadInPlace(y, c);
+    y.reverse();
+    return y;
+}
+
 /** torchcomp.ms2coef：毫秒 → 一阶平滑系数，越大越快 */
 const ms2coef = (ms: number, fs: number) => 1 - Math.exp(-2200 / ms / fs);
 
@@ -108,24 +125,55 @@ type BandParams = {
     compThresh: number; compRatio: number; expThresh: number; expRatio: number; at: number; rt: number;
 };
 
+/**
+ * 反归一化 + 母带级安全钳制。原始范围来自模型 config.json，这里把幅度约束到
+ * 「母带」而非「音色变换」的量级；模型的相对关系（哪段提、哪段压、分频点在哪）保持不变。
+ */
 export function denormalizeParams(norm: Float32Array | number[]): ItoParams {
     const v = ITO_PARAM_SPEC.map((p, i) => norm[i] * (p.max - p.min) + p.min);
     let i = 0;
     const next = () => v[i++];
-    const eq = {
-        lowShelf: { gain: next(), freq: next(), q: next() },
-        bands: [0, 1, 2, 3].map(() => ({ gain: next(), freq: next(), q: next() })),
-        highShelf: { gain: next(), freq: next(), q: next() },
-    };
-    const distortion = { driveDb: next(), mix: next() };
-    const band = (): BandParams => ({
-        compThresh: next(), compRatio: next(), expThresh: next(),
-        expRatio: next(), at: next(), rt: next(),
+    const section = (loF: number, hiF: number) => ({
+        gain: clamp(next(), -3, 3),
+        freq: clamp(next(), loF, hiF),
+        q: clamp(next(), 0.4, 2.5),
     });
-    const mb = { lowCut: next(), highCut: next(), mix: next(), low: band(), mid: band(), high: band() };
-    const gainDb = next();
-    const width = next();
-    const limiter = { threshold: next(), at: next(), rt: next() };
+    const eq = {
+        lowShelf: section(30, 250),
+        bands: [section(80, 2000), section(2000, 8000), section(8000, 12000), section(12000, 18000)],
+        highShelf: section(6000, 18000),
+    };
+    const eqSections = [eq.lowShelf, ...eq.bands, eq.highShelf];
+    // 防止 6 段同号叠加把整体频响拉成「闷」或「刺」
+    let tilt = eqSections.reduce((s, b) => s + b.gain, 0);
+    if (Math.abs(tilt) > 6) {
+        const k = 6 / Math.abs(tilt);
+        eqSections.forEach((b) => { b.gain *= k; });
+        tilt = Math.sign(tilt) * 6;
+    }
+    // 保留模型给出的整体明暗倾向，收敛段间锯齿，避免某段被「切走」
+    const mean = tilt / eqSections.length;
+    eqSections.forEach((b) => { b.gain = mean + (b.gain - mean) * 0.65; });
+    const distortion = { driveDb: clamp(next(), 0, 2.5), mix: clamp(next(), 0, 0.18) };
+    const lowCut = clamp(next(), 60, 250);
+    const highCut = Math.max(clamp(next(), 2500, 9000), lowCut * 6);
+    const mix = clamp(next(), 0.2, 0.6);
+    const band = (): BandParams => ({
+        compThresh: clamp(next(), -24, -6),
+        compRatio: clamp(next(), 1, 3.5),
+        expThresh: clamp(next(), -45, -24),
+        expRatio: clamp(next(), 0.9, 0.999),
+        at: clamp(next(), 10, 200),
+        rt: clamp(next(), 20, 300),
+    });
+    const mb = { lowCut, highCut, mix, low: band(), mid: band(), high: band() };
+    const gainDb = clamp(next(), -3, 3);
+    const width = clamp(next(), 0.42, 0.58);
+    const limiter = {
+        threshold: clamp(next(), -6, 0),
+        at: clamp(next(), 1, 30),
+        rt: clamp(next(), 20, 200),
+    };
     return { eq, distortion, mb, gainDb, width, limiter };
 }
 
@@ -136,27 +184,26 @@ function applyEQ(stem: Stem, eq: ItoParams['eq'], fs: number) {
         ['high_shelf', eq.highShelf],
     ];
     for (const [type, p] of sections) {
-        const c = biquadCoeffs(type, p.gain, clamp(p.freq, 20, fs / 2 - 1), Math.max(0.1, p.q), fs);
+        const c = biquadCoeffs(type, p.gain, clamp(p.freq, 20, fs / 2 - 1), p.q, fs);
         biquadInPlace(stem.left, c);
         biquadInPlace(stem.right, c);
     }
 }
 
+/** 单位增益补偿的软饱和：不会因 tanh 整体掉电平，也不引入可闻谐波堆积 */
 function applyDistortion(stem: Stem, d: ItoParams['distortion']) {
     const drive = Math.pow(10, d.driveDb / 20);
+    const norm = Math.tanh(drive);
     for (let i = 0; i < stem.left.length; i++) {
-        stem.left[i] = d.mix * Math.tanh(stem.left[i] * drive) + (1 - d.mix) * stem.left[i];
-        stem.right[i] = d.mix * Math.tanh(stem.right[i] * drive) + (1 - d.mix) * stem.right[i];
+        stem.left[i] = d.mix * Math.tanh(stem.left[i] * drive) / norm + (1 - d.mix) * stem.left[i];
+        stem.right[i] = d.mix * Math.tanh(stem.right[i] * drive) / norm + (1 - d.mix) * stem.right[i];
     }
 }
 
-/** LR4 分频：同一个 Q=1/√2 巴特沃斯双二阶跑两次 */
+/** 零相位分频：三个分量与干声同相，相加只改变幅度、不产生梳状滤波 */
 function crossoverBand(stem: Stem, type: string, cutoff: number, fs: number): Stem {
     const c = biquadCoeffs(type, 0, clamp(cutoff, 20, fs / 2 - 1), Math.SQRT1_2, fs);
-    const L = stem.left.slice(), R = stem.right.slice();
-    biquadInPlace(L, c); biquadInPlace(L, c);
-    biquadInPlace(R, c); biquadInPlace(R, c);
-    return { left: L, right: R };
+    return { left: biquadZeroPhase(stem.left, c), right: biquadZeroPhase(stem.right, c) };
 }
 
 /** torchcomp.compexp_gain：压缩器 + 扩展器取更严格的增益，一阶起控/释放包络 */
@@ -169,13 +216,13 @@ function compexpGain(band: Stem, p: BandParams, fs: number) {
     const expSlope = 1 - 1 / clamp(p.expRatio, EPS, 1 - EPS);
     let gg = 1;
     for (let i = 0; i < n; i++) {
-        const det = Math.abs(band.left[i] + band.right[i]) + EPS;
+        const det = Math.max(Math.abs(band.left[i]), Math.abs(band.right[i])) + EPS;
         const level = 20 * Math.log10(det);
-        const gdb = Math.min(
+        const gdb = clamp(Math.min(
             compSlope * (p.compThresh - level),
             expSlope * (p.expThresh - level),
             0,
-        );
+        ), -MAX_GR_DB, 0);
         const f = Math.pow(10, gdb / 20);
         const coeff = f < gg ? at : rt;
         gg = (1 - coeff) * gg + coeff * f;
@@ -197,8 +244,13 @@ function applyMultiband(stem: Stem, mb: ItoParams['mb'], fs: number) {
     const gMid = compexpGain(mid, mb.mid, fs);
     const gHigh = compexpGain(high, mb.high, fs);
     for (let i = 0; i < n; i++) {
-        const l = low.left[i] * gLow[i] + mid.left[i] * gMid[i] + high.left[i] * gHigh[i];
-        const r = low.right[i] * gLow[i] + mid.right[i] * gMid[i] + high.right[i] * gHigh[i];
+        // 保留整体电平控制，收敛频段间相对变化，避免音色随节目内容漂移
+        const common = (gLow[i] + gMid[i] + gHigh[i]) / 3;
+        const gl = common + (gLow[i] - common) * BAND_BALANCE;
+        const gm = common + (gMid[i] - common) * BAND_BALANCE;
+        const gh = common + (gHigh[i] - common) * BAND_BALANCE;
+        const l = low.left[i] * gl + mid.left[i] * gm + high.left[i] * gh;
+        const r = low.right[i] * gl + mid.right[i] * gm + high.right[i] * gh;
         stem.left[i] = mb.mix * l + (1 - mb.mix) * stem.left[i];
         stem.right[i] = mb.mix * r + (1 - mb.mix) * stem.right[i];
     }
@@ -224,10 +276,10 @@ function applyLimiter(stem: Stem, lim: ItoParams['limiter'], fs: number) {
     const lt = Math.pow(10, lim.threshold / 20);
     let peak = 0, g = 1;
     for (let i = 0; i < stem.left.length; i++) {
-        const det = Math.abs(stem.left[i] + stem.right[i]);
+        const det = Math.max(Math.abs(stem.left[i]), Math.abs(stem.right[i]));
         const ecoef = det < peak ? rt : at;
         peak = (1 - ecoef) * peak + ecoef * det;
-        const f = Math.min(1, peak > EPS ? lt / peak : 1e9);
+        const f = Math.min(1, peak > EPS ? lt / peak : 1);
         const coeff = f < g ? at : rt;
         g = (1 - coeff) * g + coeff * f;
         stem.left[i] *= g;
@@ -242,12 +294,12 @@ export function applyItoChain(input: Stem, p: ItoParams, fs = 44100): Stem {
     applyDistortion(stem, p.distortion);
     applyMultiband(stem, p.mb, fs);
     applyGain(stem, Math.pow(10, p.gainDb / 20));
-    applyImager(stem, clamp(p.width, 0, 1));
+    applyImager(stem, p.width);
     applyLimiter(stem, p.limiter, fs);
     return stem;
 }
 
-/** 供 UI 展示的 6 段 EQ 动作与立体声宽度 */
+/** 供 UI 展示的 6 段 EQ 动作与立体声宽度（已是钳制后的实际生效值） */
 export const itoDisplay = (p: ItoParams) => ({
     eq: [
         { freq: Math.round(p.eq.lowShelf.freq), gain: Math.round(p.eq.lowShelf.gain * 10) / 10 },

@@ -52,7 +52,7 @@ type WorkerMessage =
         type: 'done';
         left: Float32Array; right: Float32Array;
         before: LoudnessReport; after: LoudnessReport;
-        display: Display; engine: Engine;
+        display: Display; engine: Engine; appliedLufs: number;
     }
     | { type: 'failed'; reason: string };
 
@@ -105,7 +105,10 @@ export const AutoMaster = () => {
     const runIdRef = useRef(0);
     const appliedSettings = useRef({ targetLufs: -14, ceilingDb: -1 });
 
-    const [engine, setEngine] = useState<Engine>('dsp');
+    const [engine, setEngine] = useState<Engine>('neural');
+    const [modelCached, setModelCached] = useState<boolean | null>(null);
+    const [usedEngine, setUsedEngine] = useState<Engine | null>(null);
+    const [appliedLufs, setAppliedLufs] = useState<number | null>(null);
     const [phase, setPhase] = useState<Phase>('idle');
     const [fileName, setFileName] = useState('');
     const [refName, setRefName] = useState('');
@@ -132,6 +135,18 @@ export const AutoMaster = () => {
         if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
         if (inputRef.current) URL.revokeObjectURL(inputRef.current.url);
     }, []);
+
+    /** 读取模型缓存状态，用于顶部设备标签 */
+    useEffect(() => {
+        if (engine !== 'neural') return;
+        let alive = true;
+        setModelCached(null);
+        caches.open(MODEL_CACHE).then(async (cache) => {
+            const hits = await Promise.all(ITO_MODELS.map((m) => cache.match(m.key)));
+            if (alive) setModelCached(hits.every(Boolean));
+        }).catch(() => { if (alive) setModelCached(false); });
+        return () => { alive = false; };
+    }, [engine]);
 
     /** 电平匹配 A/B：把更响的一侧衰减到同一感知响度，避免「响 = 好」的错觉 */
     useEffect(() => {
@@ -168,6 +183,8 @@ export const AutoMaster = () => {
         setAfter(null);
         setDisplay(null);
         setPlan(null);
+        setUsedEngine(null);
+        setAppliedLufs(null);
         setModelProgress(0);
         setWorkProgress(0);
         setStatus('');
@@ -232,6 +249,8 @@ export const AutoMaster = () => {
         setAfter(null);
         setDisplay(null);
         setPlan(null);
+        setUsedEngine(null);
+        setAppliedLufs(null);
         setModelProgress(0);
         setWorkProgress(0);
         setStatus('正在准备…');
@@ -249,7 +268,6 @@ export const AutoMaster = () => {
                 setStatus(data.text);
                 setWorkProgress(data.progress);
             } else if (data.type === 'failed') {
-                console.warn('母带处理未完成：', data.reason);
                 if (engine === 'neural') {
                     void clearModelCache(MODEL_CACHE, ITO_MODELS.map((m) => m.key));
                 }
@@ -263,6 +281,8 @@ export const AutoMaster = () => {
                 setBefore(data.before);
                 setAfter(data.after);
                 setDisplay(data.display);
+                setUsedEngine(data.engine);
+                setAppliedLufs(data.appliedLufs);
                 setWorkProgress(1);
                 setStatus('母带处理完成');
                 setPhase('done');
@@ -299,11 +319,15 @@ export const AutoMaster = () => {
                     sampleRate: FS,
                 }, [stem.left.buffer, stem.right.buffer]);
             } else {
-                setStatus('正在准备 AI 模型（首次约 368MB，之后走缓存）…');
-                const { buffers, fromCache } = await loadModelFiles(MODEL_CACHE, ITO_MODELS, setModelProgress);
+                setStatus('正在准备 AI 模型（0 / 368 MB）…');
+                const { buffers, fromCache } = await loadModelFiles(MODEL_CACHE, ITO_MODELS, (ratio) => {
+                    setModelProgress(ratio);
+                    setStatus(`正在下载 AI 模型 ${(ratio * 368).toFixed(0)} / 368 MB…`);
+                });
                 if (runIdRef.current !== runId) return;
                 setModelProgress(1);
-                setStatus(fromCache ? '模型已从缓存读取' : '模型已下载并缓存');
+                setModelCached(true);
+                setStatus(fromCache ? '模型已就绪' : '模型已下载并缓存');
                 const left = buffer.getChannelData(0).slice();
                 const right = (buffer.numberOfChannels > 1
                     ? buffer.getChannelData(1) : buffer.getChannelData(0)).slice();
@@ -330,7 +354,7 @@ export const AutoMaster = () => {
     const download = () => {
         if (!resultBlob) return;
         const base = (fileName || 'audio').replace(/\.[^.]+$/, '');
-        downloadBlob(resultBlob, `${base}_master_${engine === 'neural' ? 'ITO' : 'DSP'}_${targetLufs}LUFS.wav`);
+        downloadBlob(resultBlob, `${base}_master_${engine === 'neural' ? 'ITO' : 'DSP'}_${(appliedLufs ?? targetLufs).toFixed(1)}LUFS.wav`);
     };
 
     const busy = phase === 'working';
@@ -339,9 +363,12 @@ export const AutoMaster = () => {
     return (
         <div className="auto-master">
             <div className="am-header">
-                <h3 className="am-title">✨ AI 自动母带</h3>
+                <h3 className="am-title">{neural ? '✨ AI 神经母带' : 'DSP 智能母带'}</h3>
                 <span className={`am-device ${deviceKind}`}>
-                    {deviceLabel || (neural ? '模型推理' : `本地 · ${threads || '多核'} 线程`)}
+                    {deviceLabel || (neural
+                        ? modelCached === false ? '模型未下载 · 首次约 368MB'
+                            : modelCached ? '模型已缓存' : '正在检查模型…'
+                        : `本地 · ${threads || '多核'} 线程`)}
                 </span>
             </div>
 
@@ -366,9 +393,9 @@ export const AutoMaster = () => {
 
             <p className="am-desc">
                 {neural
-                    ? 'Sony Research ITO-Master 白盒神经母带：FXencoder + TCN 在 WebGPU（失败自动降级 WASM）推理出 46 个可解释参数，驱动 6 模块工业链（6 段参量 EQ／饱和／3 段 Linkwitz-Riley 多频压缩／增益／M-S 立体声／限制器）。CC BY-NC 4.0，仅限非商业使用。'
+                    ? 'Sony Research ITO-Master 白盒神经母带：FXencoder + TCN 在 WebGPU（失败自动降级 WASM）推理出 46 个母带参数，驱动 6 模块 DSP 链（参量 EQ／饱和／多频压缩／增益／立体声／限制器），按设定响度与真峰值输出。首次使用需下载 368MB 模型。CC BY-NC 4.0，仅限非商业使用。'
                     : '零模型 DSP 智能母带：BS.1770-4 K 加权多核并行分析 → 30Hz 次声清理 → 校正 EQ → 胶合压缩 → 温和饱和，响度与真峰值由交付层按 EBU R128 两遍归一化。'}
-                {' '}测量结果含积分响度 LUFS-I、4× 过采样真峰值 dBTP 与响度范围 LRA，导出 24-bit WAV。
+                {' '}测量结果含积分响度 LUFS-I、真峰值 dBTP 与响度范围 LRA，导出 24-bit WAV。
             </p>
 
             <label
@@ -407,6 +434,21 @@ export const AutoMaster = () => {
                         <span>{refName ? `参考曲：${refName}` : '参考曲（可选，不选则用输入自身风格）'}</span>
                     </label>
                     {refName && <button onClick={clearReference} disabled={busy} title="移除参考曲">×</button>}
+                </div>
+            )}
+
+            {neural && (
+                <div className="am-presets">
+                    <button
+                        disabled={busy}
+                        onClick={() => void (async () => {
+                            await clearModelCache(MODEL_CACHE, ITO_MODELS.map((m) => m.key));
+                            resetResult();
+                            setModelCached(false);
+                        })()}
+                    >
+                        清除模型缓存
+                    </button>
                 </div>
             )}
 
@@ -483,6 +525,10 @@ export const AutoMaster = () => {
                                 <span key={i}>{formatFreq(e.freq)}Hz {fmt(e.gain, 'dB')}</span>
                             ))}
                             <span>宽度 {display.width.toFixed(2)}</span>
+                            <span>引擎 {usedEngine === 'neural' ? 'ITO 神经模型' : 'DSP'}</span>
+                            {appliedLufs !== null && appliedLufs > targetLufs + 0.05 && (
+                                <span>响度保持 {appliedLufs.toFixed(1)} LUFS</span>
+                            )}
                             {plan && (
                                 <>
                                     <span>预补偿 {fmt(plan.makeupDb, 'dB')}</span>

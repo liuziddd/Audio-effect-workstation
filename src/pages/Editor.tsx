@@ -84,7 +84,7 @@ export const Editor = () => {
 
     const playerControls = {
         isPlaying, isLoaded, currentTime, duration, volume,
-        play, pause, stop, beginSeek, previewSeek, seek, setVolume, exportAudio,
+        play, pause, stop, beginSeek, previewSeek, seek, setVolume,
     };
 
     const loadAudioFile = (file: File) => {

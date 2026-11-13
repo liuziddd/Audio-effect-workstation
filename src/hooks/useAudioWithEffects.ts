@@ -98,7 +98,7 @@ export const useAudioWithEffects = (): UseAudioWithEffectsReturn => {
     const [isLoaded, setIsLoaded] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
-    const [volume, setVolumeState] = useState(1);
+    const [volume, setVolumeState] = useState(0.5);
     const [effects, setEffects] = useState<EffectConfig[]>([]);
 
     const playerRef = useRef<Tone.Player | null>(null);
@@ -148,7 +148,7 @@ export const useAudioWithEffects = (): UseAudioWithEffectsReturn => {
 
     useEffect(() => {
         const processor = new AudioEffectsProcessor();
-        const masterVolume = new Tone.Volume(0);
+        const masterVolume = new Tone.Volume(Tone.gainToDb(0.5));
         const masterLimiter = new Tone.Limiter(-1);
         processor.connect(masterVolume);
         masterVolume.connect(masterLimiter);

@@ -155,33 +155,6 @@
     font-size: 1.4em;
 }
 
-.control-btn.loop-btn {
-    position: relative;
-    transition: all 0.3s ease;
-}
-
-.control-btn.loop-btn.active {
-    background: linear-gradient(135deg, #2450FF 0%, #2450FF 100%);
-    box-shadow: 0 0 20px rgba(36, 80, 255, 0.5);
-    animation: loop-pulse 2s infinite;
-}
-
-.control-btn.loop-btn.active:hover:not(:disabled) {
-    box-shadow: 0 0 25px rgba(36, 80, 255, 0.7);
-}
-
-@keyframes loop-pulse {
-
-    0%,
-    100% {
-        box-shadow: 0 0 20px rgba(36, 80, 255, 0.5);
-    }
-
-    50% {
-        box-shadow: 0 0 30px rgba(36, 80, 255, 0.8);
-    }
-}
-
 .progress-section {
     display: flex;
     align-items: center;
@@ -195,10 +168,6 @@
     font-family: 'Courier New', monospace;
     min-width: 45px;
     text-align: center;
-}
-
-.progress-bar-container {
-    flex: 1;
 }
 
 /* CallChip 风格进度胶囊：圆角表面 + 从左侧擦过的填充层 */
@@ -276,17 +245,6 @@
     background: rgba(36, 80, 255, 0.1);
 }
 
-/* 基础播放器样式 */
-.basic-player {
-    margin-bottom: 16px;
-}
-
-.basic-audio-element {
-    width: 100%;
-    border-radius: 8px;
-    background: var(--surface-2);
-}
-
 .play-hint {
     text-align: center;
     margin-top: 16px;
@@ -343,9 +301,5 @@
         width: 55px;
         height: 55px;
         font-size: 1.3em;
-    }
-
-    .control-btn.loop-btn {
-        font-size: 1em;
     }
 }

@@ -42,6 +42,7 @@ type Response =
         left: Float32Array; right: Float32Array;
         before: LoudnessReport; after: LoudnessReport;
         display: Display; engine: 'dsp' | 'neural';
+        appliedLufs: number;
     }
     | { type: 'failed'; reason: string };
 
@@ -148,11 +149,17 @@ async function runNeuralPath(
     return parOut.params.data;
 }
 
+/**
+ * 交付层：目标响度取「用户设定」与「原曲响度」的较大值。
+ * 母带是在峰值基本不变的前提下提高感知响度，不该把本来就响的素材拉回 −14 LUFS。
+ */
 function finish(targetLufs: number, ceilingDb: number) {
-    const { stem, report } = finalizeMaster(rawStem!, targetLufs, ceilingDb, sampleRate);
+    const floor = reportBefore!.lufs;
+    const appliedLufs = isFinite(floor) ? Math.max(targetLufs, floor) : targetLufs;
+    const { stem, report } = finalizeMaster(rawStem!, appliedLufs, ceilingDb, sampleRate);
     post({
         type: 'done', left: stem.left, right: stem.right,
-        before: reportBefore!, after: report, display, engine,
+        before: reportBefore!, after: report, display, engine, appliedLufs,
     }, [stem.left.buffer, stem.right.buffer]);
 }
 

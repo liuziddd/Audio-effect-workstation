@@ -1,15 +1,17 @@
 import { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Github } from 'lucide-react';
+import { BookOpen, Github, Music2 } from 'lucide-react';
 
 interface HomeProps {
     onStart: (origin: { x: number; y: number }) => void;
 }
 
-/** 联系方式 */
+/** 联系方式与个人站点 */
 const CONTACT = {
     github: 'https://github.com/liuziddd',
     wechat: 'lyx0504210019',
+    beats: 'https://liuyx.my.canvasite.cn/beat',
+    blog: 'https://www.lyxblog.click',
 };
 
 /** 微信按钮：点击复制微信号 */
@@ -133,6 +135,26 @@ export const Home = ({ onStart }: HomeProps) => {
                 >
                     <Github className="w-5 h-5 text-white group-hover:text-neon-blue transition-colors" />
                 </a>
+                {/* 音乐作品集 */}
+                <a
+                    href={CONTACT.beats}
+                    target="_blank"
+                    rel="noreferrer"
+                    title="音乐作品集"
+                    className="group flex items-center justify-center w-10 h-10 rounded-full border border-white/15 bg-white/5 backdrop-blur-md hover:bg-neon-blue/20 hover:border-neon-blue transition-all duration-300"
+                >
+                    <Music2 className="w-5 h-5 text-white group-hover:text-neon-blue transition-colors" />
+                </a>
+                {/* 个人博客 */}
+                <a
+                    href={CONTACT.blog}
+                    target="_blank"
+                    rel="noreferrer"
+                    title="个人博客"
+                    className="group flex items-center justify-center w-10 h-10 rounded-full border border-white/15 bg-white/5 backdrop-blur-md hover:bg-neon-blue/20 hover:border-neon-blue transition-all duration-300"
+                >
+                    <BookOpen className="w-5 h-5 text-white group-hover:text-neon-blue transition-colors" />
+                </a>
             </motion.div>
         </header>
 
@@ -191,9 +213,16 @@ export const Home = ({ onStart }: HomeProps) => {
                 className="rounded-3xl border border-white/10 bg-white/[0.03] backdrop-blur-md p-8 md:p-12"
             >
                 <p className="text-neon-purple text-sm font-semibold tracking-widest mb-3">ABOUT</p>
-                <h2 className="text-3xl md:text-4xl font-bold mb-5">刘友旭</h2>
+                <div className="flex items-center gap-4 mb-5">
+                    <img
+                        src="/avatar.jpg"
+                        alt="NiYox"
+                        className="w-14 h-14 md:w-16 md:h-16 rounded-full object-cover border border-white/20"
+                    />
+                    <h2 className="text-3xl md:text-4xl font-bold">NiYox</h2>
+                </div>
                 <p className="text-gray-300 leading-relaxed mb-6">
-                    中国传媒大学智能装备与系统（自动化）专业在读，独立开发者与音乐制作人。七年音乐制作经验，
+                    独立开发者与音乐制作人。七年音乐制作经验，
                     精通 FL Studio 等主流 DAW 全流程；擅长用代码做音频——从 Web Audio 实时效果器、AI 音轨分离，
                     到嵌入式音频硬件与全景声评价，横跨前端、算法与硬件。
                 </p>

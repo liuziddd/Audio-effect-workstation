@@ -107,7 +107,7 @@ const StemSeparator: React.FC = () => {
             });
             // 缓存命中也要把模型条置满，否则会一直停在 0% 造成「卡住」的错觉
             setDownloadProgress(1);
-            setStatusText(fromCache ? '已从浏览器缓存读取模型' : '模型已下载并缓存（下次无需再下载）');
+            setStatusText(fromCache ? '已从浏览器缓存读取模型' : '模型已下载并缓存');
 
             const worker = new StemSeparatorWorker();
             workerRef.current = worker;
@@ -129,8 +129,6 @@ const StemSeparator: React.FC = () => {
                     worker.terminate();
                     workerRef.current = null;
                 } else if (data.type === 'failed') {
-                    // 推理失败：状态复位 + 清掉可能损坏的模型缓存，下次重新下载
-                    console.warn('音轨分离未完成：', data.reason);
                     void clearModelCache(MODEL_CACHE, [DEMUCS_MODEL.key]);
                     worker.terminate();
                     workerRef.current = null;

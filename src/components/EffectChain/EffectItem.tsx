@@ -80,7 +80,7 @@ export const EffectItem: React.FC<EffectItemProps> = ({
                         <Power className="w-4 h-4" />
                     </button>
                     <button
-                        className={`control-btn expand-btn ${isExpanded ? 'active' : ''}`}
+                        className={`control-btn ${isExpanded ? 'active' : ''}`}
                         onClick={() => setIsExpanded(!isExpanded)}
                         title={isExpanded ? '收起参数' : '展开参数'}
                     >
