@@ -151,7 +151,7 @@ export const Editor = () => {
 
     return (
         <div
-            className="min-h-screen font-sans overflow-x-hidden"
+            className="editor-scope min-h-screen font-sans overflow-x-hidden"
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => e.preventDefault()}
         >

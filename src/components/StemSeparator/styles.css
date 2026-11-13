@@ -1,11 +1,7 @@
 .stem-separator {
     display: flex;
     flex-direction: column;
-    gap: 14px;
-    padding: 22px;
-    background: linear-gradient(to bottom right, rgba(20, 20, 26, 0.9), rgba(40, 40, 48, 0.9));
-    border: 1px solid rgba(123, 156, 255, 0.25);
-    border-radius: 12px;
+    gap: 12px;
 }
 
 .stem-header {
@@ -17,12 +13,10 @@
 }
 
 .stem-title {
-    font-weight: 600;
-    font-size: 1.1em;
-    background: linear-gradient(to right, #7B9CFF, #5B7BFF);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
     margin: 0;
+    font-size: 1.05em;
+    font-weight: 600;
+    color: var(--text);
 }
 
 .stem-device {
@@ -45,9 +39,9 @@
 }
 
 .stem-desc {
-    color: #9ca3af;
-    font-size: 0.85em;
-    line-height: 1.6;
+    color: var(--text-muted);
+    font-size: 0.82em;
+    line-height: 1.65;
     margin: 0;
 }
 

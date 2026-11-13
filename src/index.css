@@ -167,59 +167,60 @@ body.effect-dragging * {
     user-select: none;
 }
 
-/* ===== 亮色主题：把深色主题里硬编码的 Tailwind 白字 / 浅灰字 / 白边框映射为深色 token ===== */
-html.light .text-white {
+/* ===== 亮色主题：仅编辑页需要把硬编码的 Tailwind 白字/浅灰字/白边框映射为深色 token =====
+   首页是固定的深色壁纸 + 白字，主题切换时除左上角两个图标外保持不变，故用 .editor-scope 限定作用域 */
+html.light .editor-scope .text-white {
     color: var(--text);
 }
 
-html.light .text-white\/60,
-html.light .text-white\/70,
-html.light .text-white\/80 {
+html.light .editor-scope .text-white\/60,
+html.light .editor-scope .text-white\/70,
+html.light .editor-scope .text-white\/80 {
     color: var(--text-muted);
 }
 
-html.light .text-gray-300,
-html.light .text-gray-400 {
+html.light .editor-scope .text-gray-300,
+html.light .editor-scope .text-gray-400 {
     color: var(--text-muted);
 }
 
-html.light .text-gray-500 {
+html.light .editor-scope .text-gray-500 {
     color: var(--text-faint);
 }
 
-html.light .border-white\/10 {
+html.light .editor-scope .border-white\/10 {
     border-color: var(--border);
 }
 
-html.light .border-white\/15 {
+html.light .editor-scope .border-white\/15 {
     border-color: var(--border-strong);
 }
 
-html.light .border-gray-600,
-html.light .border-gray-700 {
+html.light .editor-scope .border-gray-600,
+html.light .editor-scope .border-gray-700 {
     border-color: var(--border);
 }
 
-html.light .bg-white\/5 {
+html.light .editor-scope .bg-white\/5 {
     background-color: rgba(0, 0, 0, 0.04);
 }
 
-html.light .bg-white\/\[0\.03\] {
+html.light .editor-scope .bg-white\/\[0\.03\] {
     background-color: rgba(0, 0, 0, 0.03);
 }
 
-html.light .bg-gray-800 {
+html.light .editor-scope .bg-gray-800 {
     background-color: var(--surface-2);
 }
 
-html.light .bg-dark-surface {
+html.light .editor-scope .bg-dark-surface {
     background-color: var(--surface);
 }
 
-html.light .border-dark-border {
+html.light .editor-scope .border-dark-border {
     border-color: var(--border);
 }
 
-html.light .placeholder-gray-500::placeholder {
+html.light .editor-scope .placeholder-gray-500::placeholder {
     color: var(--text-faint);
 }

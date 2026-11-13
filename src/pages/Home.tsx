@@ -51,7 +51,7 @@ const BlurReveal = ({ text }: { text: string }) => (
         {text.split('').map((char, i) => (
             <motion.span
                 key={i}
-                className="inline-block bg-gradient-to-b from-[var(--text)] via-[#B8C4D8] to-neon-purple bg-clip-text text-transparent"
+                className="inline-block bg-gradient-to-b from-white via-[#B8C4D8] to-neon-purple bg-clip-text text-transparent"
                 initial={{ opacity: 0, y: 30, filter: 'blur(14px)' }}
                 animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
                 transition={{ delay: 0.35 + i * 0.07, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
@@ -102,7 +102,7 @@ const MagneticButton = ({ onClick, children }: { onClick: (origin: { x: number; 
 
 export const Home = ({ onStart }: HomeProps) => {
     return (
-        <div className="relative min-h-screen overflow-x-hidden">
+        <div className="relative min-h-screen overflow-x-hidden" style={{ color: '#ffffff' }}>
             {/* 背景：绿色渐变壁纸（单层，暗化内建到 background-image 叠加层） */}
             <div
                 className="fixed inset-0 pointer-events-none"

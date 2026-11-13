@@ -29,6 +29,18 @@ const MODEL_SOURCES = [
 const MODEL_CACHE = 'demucs-model-v1';
 // 缓存 key 用固定标识，与具体下载源解耦：换源/多源回退不会让已缓存的模型失效
 const MODEL_CACHE_KEY = 'htdemucs_embedded.onnx';
+// HTDemucs 模型约 172MB；低于此值说明拿到的是错误页或不完整下载
+const MIN_MODEL_BYTES = 1024 * 1024;
+
+/** 推理失败时清掉可能不完整/损坏的模型缓存，下次重新下载，避免永久卡死 */
+const clearModelCache = async () => {
+    const cache = await caches.open(MODEL_CACHE);
+    await cache.delete(MODEL_CACHE_KEY);
+};
+
+const assertValidModel = (bytes: Uint8Array) => {
+    if (bytes.byteLength < MIN_MODEL_BYTES) throw new Error('模型数据不完整');
+};
 
 // 分片并行下载参数：镜像走海外存储，单连接带宽低，多连接分片可显著提速
 const PARALLEL_CHUNKS = 8;   // 同时并发 8 路分片
@@ -138,7 +150,13 @@ async function loadModelBuffer(onProgress: (loaded: number, total: number) => vo
     Promise<{ buffer: ArrayBuffer; fromCache: boolean }> {
     const cache = await caches.open(MODEL_CACHE);
     const cached = await cache.match(MODEL_CACHE_KEY);
-    if (cached) return { buffer: await cached.arrayBuffer(), fromCache: true };
+    if (cached) {
+        const bytes = new Uint8Array(await cached.arrayBuffer());
+        if (bytes.byteLength >= MIN_MODEL_BYTES) {
+            return { buffer: bytes.buffer, fromCache: true };
+        }
+        await cache.delete(MODEL_CACHE_KEY);
+    }
 
     let lastError: Error = new Error('所有模型源均不可用');
     for (const url of MODEL_SOURCES) {
@@ -164,6 +182,7 @@ async function loadModelBuffer(onProgress: (loaded: number, total: number) => vo
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 bytes = await readBodyWithProgress(res, onProgress);
             }
+            assertValidModel(bytes);
             await cache.put(MODEL_CACHE_KEY, new Response(bytes));
             return { buffer: bytes.buffer, fromCache: false };
         } catch (error) {
@@ -262,7 +281,21 @@ const StemSeparator: React.FC = () => {
                     setStems(data.result);
                     setPhase('done');
                     worker.terminate();
+                    workerRef.current = null;
+                } else if (data.type === 'failed') {
+                    // 推理失败：状态复位 + 清掉可能损坏的模型缓存，下次重新下载
+                    console.warn('音轨分离未完成：', data.reason);
+                    void clearModelCache();
+                    worker.terminate();
+                    workerRef.current = null;
+                    setPhase('idle');
                 }
+            };
+            worker.onerror = () => {
+                // worker 脚本/模块加载失败：同样复位，避免永久卡在「处理中」
+                worker.terminate();
+                workerRef.current = null;
+                setPhase('idle');
             };
 
             worker.postMessage(
