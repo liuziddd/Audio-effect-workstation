@@ -3,6 +3,7 @@ import StemSeparatorWorker from '../../workers/stemSeparator.worker?worker';
 import { dragBridge } from '../../utils/dragBridge';
 import LatticeLoader from '../effects/LatticeLoader';
 import { encodeWav } from '../../utils/wav';
+import { loadModelFile, clearModelCache, type ModelFileSpec } from '../../utils/modelDownload';
 import './styles.css';
 
 interface StemData {
@@ -21,177 +22,19 @@ const SAMPLE_RATE = 44100;
 
 const formatBytes = (bytes: number) => (bytes / 1024 / 1024).toFixed(1) + ' MB';
 
-// 模型多源列表：国内镜像优先，官方 HuggingFace 兜底；任一可用即可
-const MODEL_SOURCES = [
-    'https://hf-mirror.com/timcsy/demucs-web-onnx/resolve/main/htdemucs_embedded.onnx',
-    'https://huggingface.co/timcsy/demucs-web-onnx/resolve/main/htdemucs_embedded.onnx',
-];
+
 const MODEL_CACHE = 'demucs-model-v1';
-// 缓存 key 用固定标识，与具体下载源解耦：换源/多源回退不会让已缓存的模型失效
-const MODEL_CACHE_KEY = 'htdemucs_embedded.onnx';
-// HTDemucs 模型约 172MB；低于此值说明拿到的是错误页或不完整下载
-const MIN_MODEL_BYTES = 1024 * 1024;
-
-/** 推理失败时清掉可能不完整/损坏的模型缓存，下次重新下载，避免永久卡死 */
-const clearModelCache = async () => {
-    const cache = await caches.open(MODEL_CACHE);
-    await cache.delete(MODEL_CACHE_KEY);
+const DEMUCS_MODEL: ModelFileSpec = {
+    key: 'htdemucs_embedded.onnx',
+    urls: [
+        'https://hf-mirror.com/timcsy/demucs-web-onnx/resolve/main/htdemucs_embedded.onnx',
+        'https://huggingface.co/timcsy/demucs-web-onnx/resolve/main/htdemucs_embedded.onnx',
+    ],
+    minBytes: 1024 * 1024,
+    expectedBytes: 180534758,
 };
-
-const assertValidModel = (bytes: Uint8Array) => {
-    if (bytes.byteLength < MIN_MODEL_BYTES) throw new Error('模型数据不完整');
-};
-
-// 分片并行下载参数：镜像走海外存储，单连接带宽低，多连接分片可显著提速
-const PARALLEL_CHUNKS = 8;   // 同时并发 8 路分片
-const CHUNK_RETRY = 3;       // 单片失败最多重试 3 次
-
-/** 探测模型总大小并验证是否支持 Range（分片）下载。返回字节数，不支持返回 null */
-const probeModelSize = async (url: string): Promise<number | null> => {
-    try {
-        const res = await fetch(url, { headers: { Range: 'bytes=0-0' } });
-        if (res.status === 206) {
-            const cr = res.headers.get('content-range'); // 形如 "bytes 0-0/180534758"
-            const m = cr?.match(/\/(\d+)\s*$/);
-            if (m) return Number(m[1]);
-        }
-        const cl = res.headers.get('content-length');
-        return cl ? Number(cl) : null;
-    } catch {
-        return null;
-    }
-};
-
-/** 流式读取响应体（单线程兜底路径），回调下载进度 */
-const readBodyWithProgress = async (
-    res: Response,
-    onProgress: (loaded: number, total: number) => void,
-): Promise<Uint8Array> => {
-    const total = Number(res.headers.get('content-length')) || 0;
-    if (!res.body) {
-        const buffer = new Uint8Array(await res.arrayBuffer());
-        onProgress(buffer.byteLength, total || buffer.byteLength);
-        return buffer;
-    }
-    const reader = res.body.getReader();
-    const chunks: Uint8Array[] = [];
-    let loaded = 0;
-    for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value);
-        loaded += value.length;
-        onProgress(loaded, total);
-    }
-    const buffer = new Uint8Array(loaded);
-    let offset = 0;
-    for (const chunk of chunks) {
-        buffer.set(chunk, offset);
-        offset += chunk.length;
-    }
-    return buffer;
-};
-
-/** 多连接分片并行下载：按 Range 切成 N 片并发拉取，再按序拼接 */
-const downloadParallel = async (
-    url: string,
-    total: number,
-    onProgress: (loaded: number, total: number) => void,
-): Promise<Uint8Array> => {
-    const chunkSize = Math.ceil(total / PARALLEL_CHUNKS);
-    const ranges: { start: number; end: number }[] = [];
-    for (let start = 0; start < total; start += chunkSize) {
-        ranges.push({ start, end: Math.min(start + chunkSize - 1, total - 1) });
-    }
-
-    const parts = new Array<Uint8Array>(ranges.length);
-    let loaded = 0;
-    let nextIndex = 0;
-
-    const fetchOne = async (index: number): Promise<void> => {
-        const { start, end } = ranges[index];
-        let data: Uint8Array | null = null;
-        for (let attempt = 0; attempt < CHUNK_RETRY && !data; attempt++) {
-            const res = await fetch(url, { headers: { Range: `bytes=${start}-${end}` } });
-            if (res.status === 206) {
-                data = new Uint8Array(await res.arrayBuffer());
-                break;
-            }
-            // 服务端忽略 Range 返回整包，说明该源不支持分片，抛出交给上层降级
-            if (res.status === 200) throw new Error('RANGE_UNSUPPORTED');
-        }
-        if (!data) throw new Error(`分片下载失败（bytes ${start}-${end}）`);
-        parts[index] = data;
-        loaded += data.byteLength;
-        onProgress(loaded, total);
-    };
-
-    // 并发工作池：每个 worker 循环取下一个未下载的分片
-    const workerCount = Math.min(PARALLEL_CHUNKS, ranges.length);
-    await Promise.all(
-        Array.from({ length: workerCount }, async () => {
-            for (;;) {
-                const index = nextIndex++;
-                if (index >= ranges.length) break;
-                await fetchOne(index);
-            }
-        }),
-    );
-
-    const buffer = new Uint8Array(total);
-    for (let i = 0; i < ranges.length; i++) {
-        buffer.set(parts[i], ranges[i].start);
-    }
-    return buffer;
-};
-
-/** 主线程加载模型：优先读浏览器缓存，未命中则多源回退下载并写入缓存 */
-async function loadModelBuffer(onProgress: (loaded: number, total: number) => void):
-    Promise<{ buffer: ArrayBuffer; fromCache: boolean }> {
-    const cache = await caches.open(MODEL_CACHE);
-    const cached = await cache.match(MODEL_CACHE_KEY);
-    if (cached) {
-        const bytes = new Uint8Array(await cached.arrayBuffer());
-        if (bytes.byteLength >= MIN_MODEL_BYTES) {
-            return { buffer: bytes.buffer, fromCache: true };
-        }
-        await cache.delete(MODEL_CACHE_KEY);
-    }
-
-    let lastError: Error = new Error('所有模型源均不可用');
-    for (const url of MODEL_SOURCES) {
-        try {
-            // 先探测大小 + 是否支持分片；支持则多线程并行下载，否则退化为单流
-            const total = await probeModelSize(url);
-            let bytes: Uint8Array;
-            if (total && total > 0) {
-                try {
-                    bytes = await downloadParallel(url, total, onProgress);
-                } catch (error) {
-                    // 分片被服务端拒绝时退回单线程整包下载
-                    if (error instanceof Error && error.message === 'RANGE_UNSUPPORTED') {
-                        const res = await fetch(url);
-                        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                        bytes = await readBodyWithProgress(res, onProgress);
-                    } else {
-                        throw error;
-                    }
-                }
-            } else {
-                const res = await fetch(url);
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                bytes = await readBodyWithProgress(res, onProgress);
-            }
-            assertValidModel(bytes);
-            await cache.put(MODEL_CACHE_KEY, new Response(bytes));
-            return { buffer: bytes.buffer, fromCache: false };
-        } catch (error) {
-            lastError = error instanceof Error ? error : new Error(String(error));
-            // 换下一个源继续尝试
-        }
-    }
-    throw new Error(`模型下载失败（网络不可达）：${lastError.message}`);
-}
+const loadModelBuffer = (onProgress: (loaded: number, total: number) => void) =>
+    loadModelFile(MODEL_CACHE, DEMUCS_MODEL, onProgress);
 
 type Phase = 'idle' | 'working' | 'done';
 
@@ -288,7 +131,7 @@ const StemSeparator: React.FC = () => {
                 } else if (data.type === 'failed') {
                     // 推理失败：状态复位 + 清掉可能损坏的模型缓存，下次重新下载
                     console.warn('音轨分离未完成：', data.reason);
-                    void clearModelCache();
+                    void clearModelCache(MODEL_CACHE, [DEMUCS_MODEL.key]);
                     worker.terminate();
                     workerRef.current = null;
                     setPhase('idle');

@@ -9,6 +9,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 10px;
+    flex-wrap: wrap;
 }
 
 .am-title {
@@ -18,20 +19,209 @@
     color: var(--text);
 }
 
-.am-badge {
-    font-size: 0.72em;
-    padding: 3px 9px;
+.am-device {
+    font-size: 0.76em;
+    padding: 3px 10px;
     border-radius: 999px;
-    border: 1px solid var(--border-strong);
-    color: var(--text-muted);
+    border: 1px solid;
     white-space: nowrap;
+}
+
+.am-device.gpu {
+    color: #5B7BFF;
+    border-color: rgba(91, 123, 255, 0.5);
+    background: rgba(91, 123, 255, 0.1);
+}
+
+.am-device.cpu {
+    color: #9CA3AF;
+    border-color: rgba(156, 163, 175, 0.5);
+    background: rgba(156, 163, 175, 0.1);
+}
+
+.am-engines {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.am-engine {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text-muted);
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.am-engine strong {
+    font-size: 0.88em;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.am-engine span {
+    font-size: 0.72em;
+    opacity: 0.8;
+}
+
+.am-engine:hover:not(:disabled) {
+    border-color: rgba(123, 156, 255, 0.6);
+}
+
+.am-engine.active {
+    border-color: #5B7BFF;
+    background: rgba(91, 123, 255, 0.16);
+}
+
+.am-engine:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 .am-desc {
     margin: 0;
-    font-size: 0.82em;
+    font-size: 0.8em;
     line-height: 1.65;
     color: var(--text-muted);
+}
+
+.am-dropzone {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+    border: 1px dashed rgba(123, 156, 255, 0.5);
+    border-radius: 10px;
+    color: #7B9CFF;
+    font-size: 0.92em;
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease;
+    text-align: center;
+    overflow: hidden;
+    word-break: break-all;
+}
+
+.am-dropzone:hover,
+.am-dropzone.drag-over {
+    background: rgba(123, 156, 255, 0.16);
+    border-color: #7B9CFF;
+}
+
+.am-dropzone.disabled {
+    opacity: 0.5;
+    cursor: wait;
+}
+
+.am-dropzone input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.am-reference {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.am-reference label {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    padding: 9px 12px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    font-size: 0.78em;
+    color: var(--text-muted);
+    cursor: pointer;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.am-reference label:hover {
+    border-color: rgba(123, 156, 255, 0.6);
+}
+
+.am-reference label input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.am-reference > button {
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text-muted);
+    font-size: 1.1em;
+    cursor: pointer;
+}
+
+.am-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.am-settings__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 0.8em;
+    color: var(--text-muted);
+}
+
+.am-settings__head strong {
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+}
+
+.am-slider {
+    width: 100%;
+    margin: 2px 0 4px;
+}
+
+.am-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.am-presets button {
+    padding: 4px 9px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.73em;
+    cursor: pointer;
+}
+
+.am-presets button:hover {
+    border-color: rgba(123, 156, 255, 0.6);
+}
+
+.am-presets button.active {
+    border-color: #5B7BFF;
+    background: rgba(91, 123, 255, 0.16);
+    color: var(--text);
 }
 
 .am-run {
@@ -50,20 +240,20 @@
 .am-run:hover:not(:disabled) { filter: brightness(1.25); }
 .am-run:disabled { opacity: 0.45; cursor: not-allowed; }
 
-.am-hint {
-    margin: 0;
-    font-size: 0.82em;
-    color: var(--text-faint);
+.am-progress-area {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: rgba(123, 156, 255, 0.06);
+    border: 1px solid rgba(123, 156, 255, 0.2);
 }
 
 .am-progress {
     display: flex;
     flex-direction: column;
-    gap: 7px;
-    padding: 11px 13px;
-    border-radius: 10px;
-    background: rgba(123, 156, 255, 0.06);
-    border: 1px solid rgba(123, 156, 255, 0.2);
+    gap: 6px;
 }
 
 .am-progress__head {
@@ -85,10 +275,16 @@
     width: 100%;
     height: 100%;
     border-radius: 999px;
-    background: var(--accent);
+    background: linear-gradient(90deg, #2450FF, #7B9CFF);
     transform: scaleX(0);
     transform-origin: left center;
     transition: transform 0.25s ease;
+}
+
+.am-status {
+    margin: 0;
+    color: #7B9CFF;
+    font-size: 0.8em;
 }
 
 .am-metrics {
@@ -130,7 +326,7 @@
 }
 
 .am-plan span {
-    font-size: 0.73em;
+    font-size: 0.72em;
     padding: 4px 9px;
     border-radius: 999px;
     border: 1px solid var(--border);
@@ -142,6 +338,34 @@
     display: flex;
     flex-direction: column;
     gap: 9px;
+}
+
+.am-ab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.am-ab button {
+    padding: 5px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.78em;
+    cursor: pointer;
+}
+
+.am-ab button.active {
+    border-color: #5B7BFF;
+    background: rgba(91, 123, 255, 0.16);
+    color: var(--text);
+}
+
+.am-ab span {
+    margin-left: auto;
+    font-size: 0.72em;
+    color: var(--text-faint);
 }
 
 .am-result audio {
@@ -159,4 +383,5 @@
     font-size: 0.85em;
     cursor: pointer;
 }
+
 .am-download:hover { background: rgba(36, 80, 255, 0.3); }

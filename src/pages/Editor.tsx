@@ -331,7 +331,7 @@ export const Editor = () => {
                             {activeTool === 'inspector' ? (
                                 <AudioInspector />
                             ) : activeTool === 'master' ? (
-                                <AutoMaster audioFile={audioFile} />
+                                <AutoMaster />
                             ) : (
                                 <Suspense fallback={<div className="text-center p-8 text-white/60">正在加载分离引擎…</div>}>
                                     <StemSeparator />
