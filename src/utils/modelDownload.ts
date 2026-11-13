@@ -20,20 +20,26 @@ interface LoadedModel {
 
 const PARALLEL_CHUNKS = 4;
 const CHUNK_RETRY = 3;
+/** 固定 8MB 分片：单片失败只丢 8MB，中断后恢复粒度更细 */
+const CHUNK_BYTES = 8 * 1024 * 1024;
 
 /** 可选：ModelScope 公开仓库 ID，配置后自动作为首选国内源 */
 const SCOPE_REPO = (import.meta.env.VITE_MODELSCOPE_REPO as string | undefined)?.trim() ?? '';
 
+/**
+ * 必须用 `models/{repo}/resolve/` 形式：`api/v1/models/{repo}/repo?FilePath=` 的 302
+ * 不带 Access-Control-Allow-Origin，浏览器会直接拦掉重定向（表现为 302 后拿不到数据）。
+ */
 const sourcesOf = (spec: ModelFileSpec): string[] => {
     if (!SCOPE_REPO) return spec.urls;
     const name = spec.urls[0].split('/').pop()!;
     return [
-        `https://www.modelscope.cn/api/v1/models/${SCOPE_REPO}/repo?Revision=master&FilePath=${encodeURIComponent(name)}`,
+        `https://www.modelscope.cn/models/${SCOPE_REPO}/resolve/master/${encodeURIComponent(name)}`,
         ...spec.urls,
     ];
 };
 
-const partKey = (key: string, index: number) => `${key}.part-${index}`;
+const partKey = (key: string, index: number) => `${key}.part-v2-${index}`;
 
 /** 清掉某文件的所有分片缓存（完整文件写入后、或模型损坏时） */
 const clearParts = async (cache: Cache, key: string) => {
@@ -78,20 +84,29 @@ const downloadParallel = async (
     onProgress: (loaded: number, total: number) => void,
 ) => {
     const total = spec.expectedBytes;
-    const chunkSize = Math.ceil(total / PARALLEL_CHUNKS);
     const ranges: { start: number; end: number }[] = [];
-    for (let start = 0; start < total; start += chunkSize) {
-        ranges.push({ start, end: Math.min(start + chunkSize - 1, total - 1) });
+    for (let start = 0; start < total; start += CHUNK_BYTES) {
+        ranges.push({ start, end: Math.min(start + CHUNK_BYTES - 1, total - 1) });
     }
 
     const parts = await Promise.all(
-        ranges.map((_, i) => cache.match(partKey(spec.key, i)).then(async (hit) =>
-            hit ? new Uint8Array(await hit.arrayBuffer()) : null)),
+        ranges.map(async ({ start, end }, i) => {
+            const hit = await cache.match(partKey(spec.key, i));
+            if (!hit) return null;
+            const data = new Uint8Array(await hit.arrayBuffer());
+            // 分片长度不符（旧分片方案或写坏）直接丢弃，避免拼出损坏文件
+            if (data.byteLength !== end - start + 1) {
+                await cache.delete(partKey(spec.key, i));
+                return null;
+            }
+            return data;
+        }),
     );
     let loaded = parts.reduce((sum, part) => sum + (part?.byteLength ?? 0), 0);
     onProgress(loaded, total);
 
     let nextIndex = 0;
+    let dead = false;
     const fetchPart = async (index: number) => {
         const { start, end } = ranges[index];
         const want = end - start + 1;
@@ -106,24 +121,31 @@ const downloadParallel = async (
                 await cache.put(partKey(spec.key, index), new Response(data));
                 loaded += data.byteLength;
                 onProgress(loaded, total);
-                return;
+                return true;
             } catch (error) {
                 // 服务端完全不支持 Range 时立即交给单流兜底；其余失败只重试本片
                 if (error instanceof Error && error.message === 'RANGE_UNSUPPORTED') throw error;
             }
         }
+        return false;
     };
 
     await Promise.all(
         Array.from({ length: Math.min(PARALLEL_CHUNKS, ranges.length) }, async () => {
             for (;;) {
+                if (dead) return;
                 const index = nextIndex++;
-                if (index >= ranges.length) break;
-                if (!parts[index]) await fetchPart(index);
+                if (index >= ranges.length) return;
+                if (parts[index]) continue;
+                // 一片彻底失败即判定该源不可用，不再把剩下的分片都白试一遍
+                if (!(await fetchPart(index))) {
+                    dead = true;
+                    return;
+                }
             }
         }),
     );
-    if (parts.some((part) => !part)) throw new Error('分片下载失败');
+    if (dead || parts.some((part) => !part)) throw new Error('分片下载失败');
 
     const buffer = new Uint8Array(total);
     for (let i = 0; i < ranges.length; i++) {
