@@ -13,7 +13,7 @@ import { DynamicsGraph } from './DynamicsGraph';
 interface EffectItemProps {
     effect: EffectConfig;
     index: number;
-    /** 被 Shift 选中：可与其他选中的效果器一起调参数、一起开关 / 展开 / 删除 / 复制 */
+    /** 被 Ctrl 选中：可与其他选中的效果器一起调参数、一起开关 / 展开 / 删除 / 复制 */
     selected: boolean;
     /** 参数是否展开（由链统一管理，多选时才能整组开合） */
     expanded: boolean;
@@ -89,17 +89,17 @@ export const EffectItem: React.FC<EffectItemProps> = ({
             data-effect-id={effect.id}
             style={{ position: 'relative' }}
             onPointerDown={(event) => {
-                // 按住 Shift：整张卡片只是一个选项，按下即切换并可扫选。
+                // 按住 Ctrl：整张卡片只是一个选项，按下即切换并可扫选。
                 // 判定看这次事件自己的修饰键，全局状态只负责锁子控件。
-                if (event.shiftKey || event.metaKey) onSweep(event);
+                if (event.ctrlKey || event.metaKey) onSweep(event);
             }}
         >
-            {/* 头部：未展开时的全部区域，除按钮外均可拖拽；Shift 按下交给卡片自己切换选中 */}
+            {/* 头部：未展开时的全部区域，除按钮外均可拖拽；Ctrl 按下交给卡片自己切换选中 */}
             <div
                 className="effect-header"
                 onPointerDown={(e) => {
-                    // 按住 Shift 由整张卡片接管（切换选中 / 扫选），Ctrl 交给通道级拖动
-                    if (e.shiftKey || e.metaKey || e.ctrlKey) return;
+                    // 按住 Ctrl 由整张卡片接管（切换选中 / 扫选），Shift 交给通道级拖动
+                    if (e.ctrlKey || e.metaKey || e.shiftKey) return;
                     onSelect();
                     dragControls.start(e);
                 }}

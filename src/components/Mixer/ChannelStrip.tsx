@@ -7,20 +7,39 @@ import { dragBridge } from '../../utils/dragBridge';
 import { ValueEdit } from '../UI/ValueEdit';
 import { Waveform } from './Waveform';
 
-/** 通道颜色盘：6 × 5 共 30 色，按色相分行、同行明度递减，就近弹出 */
+/**
+ * 通道颜色盘：6 × 5 共 30 色，按色相分行、同行明度递减，就近弹出。
+ * 色相取自 iOS 系统色（蓝 #007AFF / 青 #30B0C7 / 绿 #34C759 / 靛 #5856D6 / 橙 #FF9500），
+ * 明度由 92% 递减到 31%，饱和度浅档淡、中档最纯、深档略收——整条铺色时鲜亮但不刺眼。
+ */
 export const CHANNEL_COLORS = [
-    '#E2FFA0', '#C6FF4D', '#A6FF00', '#7ACC00', '#4F8A00', '#2C4F00',
-    '#B8FBF0', '#7BE8DC', '#3FD2C4', '#12A99E', '#0A7A72', '#064A46',
-    '#C9DBFF', '#93B7FF', '#5B7BFF', '#3A55D6', '#27379B', '#161F5C',
-    '#E5C9FF', '#C79BFF', '#A46BFF', '#FF7AB6', '#E0457F', '#8B1F4A',
-    '#FFE2A8', '#FFC53D', '#FF9F45', '#FF6B61', '#D63B32', '#7A1C17',
+    '#D9E3EC', '#B2C9E1', '#7FABD7', '#468ACE', '#2A70B2', '#1F5384',
+    '#CBDEE2', '#A4CDD5', '#74BCC8', '#40A8BA', '#2E8693', '#215F69',
+    '#B6D8C3', '#8ECDA5', '#5BC281', '#36A65D', '#257E44', '#18532C',
+    '#E2DDEE', '#C2B6E2', '#9B83D8', '#6D4ACF', '#502BB6', '#3A2088',
+    '#F4EEE6', '#E9D6BE', '#E0B98A', '#D99B4E', '#CB7D25', '#9C601C',
 ];
 
-/** #RRGGBB → "r, g, b"，通道整条底色的透明度由 CSS 控制 */
-const rgbOf = (hex: string) => {
+/** #RRGGBB → 相对亮度：决定这块颜色上用深字还是浅字（WCAG 的换算） */
+const luminanceOf = (hex: string) => {
     const value = parseInt(hex.replace('#', ''), 16);
-    return `${(value >> 16) & 255}, ${(value >> 8) & 255}, ${value & 255}`;
+    const [r, g, b] = [(value >> 16) & 255, (value >> 8) & 255, value & 255].map((channel) => {
+        const unit = channel / 255;
+        return unit <= 0.03928 ? unit / 12.92 : ((unit + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 };
+
+/** 通道底色就是色板里那个颜色本身，字色按亮度取深 / 浅，两个主题下都不失真。
+ *  分组名的小标签也复用同一套变量，保证「选什么色就是什么色」 */
+/** 与 tintStyle 同一套判断：深色底上给浅墨、浅色底上给深墨 */
+const inkHexOf = (color: string) => (luminanceOf(color) > 0.19 ? '#1F2418' : '#F7FAF0');
+
+export const tintStyle = (color: string) => ({
+    '--strip-tint': color,
+    // 0.19 是「深字 / 浅字对比度相等」的分界（相对亮度），不是拍脑袋的阈值
+    '--strip-ink-rgb': luminanceOf(color) > 0.19 ? '18, 21, 16' : '250, 252, 246',
+} as CSSProperties);
 
 interface ChannelStripProps {
     channel: MixerChannel;
@@ -40,16 +59,16 @@ interface ChannelStripProps {
     dragging: boolean;
     /** 已选中（可批量操作） */
     selected: boolean;
-    /** 按住了 Ctrl：整条通道可拖拽 */
-    ctrlReady: boolean;
-    /** 按住了 Shift：通道参数锁定，只做整体选中 */
+    /** 按住了 Shift：整条通道可拖拽 */
+    dragReady: boolean;
+    /** 按住了 Ctrl：通道参数锁定，只做整体选中 */
     selectMode: boolean;
     /** 已固定在左侧独立图层 */
     pinned: boolean;
     stripRef: (node: HTMLDivElement | null) => void;
     /** 碰一下通道条：选中它，并把侧栏效果器库的投放目标切到本通道 */
     onSelect: (event: React.PointerEvent) => void;
-    /** 按住 Ctrl 在通道条任意位置按下 → 开始拖动排序 */
+    /** 按住 Shift 在通道条任意位置按下 → 开始拖动排序 */
     onDragStart: (event: React.PointerEvent) => void;
     onToggleRack: () => void;
     onUpdate: (patch: Partial<MixerChannel>) => void;
@@ -103,7 +122,7 @@ export const ChannelStrip = ({
     incoming,
     dragging,
     selected,
-    ctrlReady,
+    dragReady,
     selectMode,
     pinned,
     stripRef,
@@ -199,14 +218,14 @@ export const ChannelStrip = ({
         <div
             ref={stripRef}
             data-channel-id={channel.id}
-            className={`mixer-strip ${dragOver ? 'drag-over' : ''} ${dimmed ? 'dimmed' : ''} ${routeTarget ? 'route-target' : ''} ${dragging ? 'dragging' : ''} ${selected ? 'selected' : ''} ${ctrlReady ? 'ctrl-ready' : ''} ${selectMode ? 'select-mode' : ''} ${channel.color ? 'tinted' : ''} ${pinned ? 'pinned' : ''}`}
-            style={channel.color ? ({ '--strip-tint-rgb': rgbOf(channel.color) } as CSSProperties) : undefined}
+            className={`mixer-strip ${dragOver ? 'drag-over' : ''} ${dimmed ? 'dimmed' : ''} ${routeTarget ? 'route-target' : ''} ${dragging ? 'dragging' : ''} ${selected ? 'selected' : ''} ${dragReady ? 'drag-ready' : ''} ${selectMode ? 'select-mode' : ''} ${channel.color ? 'tinted' : ''} ${pinned ? 'pinned' : ''}`}
+            style={channel.color ? tintStyle(channel.color) : undefined}
             onPointerDown={(event) => {
-                // 按住 Ctrl / Shift：整条通道就是一个判定区，子控件的指针事件由 CSS 全部关掉，
+                // 按住 Shift / Ctrl：整条通道就是一个判定区，子控件的指针事件由 CSS 全部关掉，
                 // 这里只管「整体选中 / 整体拖动」
-                if (selectMode || ctrlReady) {
+                if (selectMode || dragReady) {
                     onSelect(event);
-                    if (ctrlReady) onDragStart(event);
+                    if (dragReady) onDragStart(event);
                     return;
                 }
                 // 各种按钮与轨道自己处理指针：只按通道本体才算选中 / 拖动
@@ -325,6 +344,7 @@ export const ChannelStrip = ({
                     analyser={analyser}
                     playing={playing}
                     resetKey={`${channel.trackName}|${channel.duration}`}
+                    inkColor={channel.color ? inkHexOf(channel.color) : undefined}
                 />
                 {!loaded && !playing && <span className="strip-wave-hint">点击或拖入音频</span>}
                 {loaded && (

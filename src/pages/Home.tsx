@@ -298,9 +298,9 @@ const StaticFeatureCard = ({
 const IntroText = () => (
     <>
         <p className="text-neon-blue text-[11px] font-semibold tracking-[0.3em]">WORKSTATION</p>
-        <h2 className="mt-2 text-[26px] font-bold leading-tight">六个入口，同一间棚</h2>
+        <h2 className="mt-2 text-[26px] font-bold leading-tight">从一段素材，到成品</h2>
         <p className="mt-2.5 max-w-2xl text-sm leading-relaxed text-white/45">
-            拖进一段音频，它就坐上第八条通道——混音、效果器、分轨、母带、检测，全在这张桌子上完成。
+            导入、编配、混音、母带，在同一条链上完成。全程都在浏览器里运行，音频不出本机。
         </p>
     </>
 );

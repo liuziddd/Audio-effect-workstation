@@ -164,20 +164,61 @@
     transform: scale(1.12);
 }
 
-.mixer-palette-reset {
-    width: 100%;
-    height: 22px;
-    margin-top: 8px;
+/* 选中不足两条时只能并入已有分组，不能新成组 */
+.mixer-palette-dot:disabled {
+    opacity: 0.28;
+    cursor: default;
+}
+
+.mixer-palette-dot:disabled:hover {
+    transform: none;
+}
+
+.mixer-palette-head.is-section {
+    margin-top: 10px;
+}
+
+/* 已有分组：一行一个，点一下把选中的通道并进去 */
+.mixer-palette-groups {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 138px;
+    overflow-y: auto;
+}
+
+.mixer-palette-group {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    height: 24px;
+    padding: 0 7px;
     border: none;
-    border-radius: 8px;
+    border-radius: 7px;
     background: var(--surface-3);
     color: var(--text-muted);
     font-size: 11px;
+    text-align: left;
     cursor: pointer;
+    transition: background 0.14s, color 0.14s;
 }
 
-.mixer-palette-reset:hover {
+.mixer-palette-group:hover {
+    background: var(--surface);
     color: var(--text);
+}
+
+.mixer-palette-swatch {
+    flex: 0 0 9px;
+    width: 9px;
+    height: 9px;
+    border-radius: 3px;
+}
+
+.mixer-palette-name {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
 }
 
 /* 文件名输入 + 导出按钮：两个控件共用一条边，读起来是一个整体 */
@@ -282,8 +323,8 @@
     height: 100%;
     display: flex;
     gap: 8px;
-    /* 底部 16 = 8 滚动条 + 8 余量：通道条不贴卡片下沿，滚动条也不抢高度 */
-    padding: 12px 12px 8px;
+    /* 顶部 30 = 12 余量 + 18 给分组名；底部 8 让通道条不贴卡片下沿 */
+    padding: 30px 12px 8px;
     /* 恒定为 scroll：滚动条的位置一直留着，通道再多一截也不会突然变矮 */
     overflow-x: scroll;
     overflow-y: hidden;
@@ -319,8 +360,9 @@
     display: flex;
     gap: 8px;
     width: max-content;
-    /* 与滚动区通道的底边对齐：8 余量 + 实际滚动条高度（overlay 滚动条为 0，由 JS 实测） */
-    padding: 12px 6px calc(8px + var(--mixer-scrollbar, 0px)) 12px;
+    /* 与滚动区通道的底边对齐：8 余量 + 实际滚动条高度（overlay 滚动条为 0，由 JS 实测）；
+       顶部 30 与滚动区一致，分组名那一行两边要齐平 */
+    padding: 30px 6px calc(8px + var(--mixer-scrollbar, 0px)) 12px;
     background: var(--surface);
     border-right: 1px solid var(--border-strong);
     border-radius: 0 0 0 18px;
@@ -329,6 +371,7 @@
 
 /* 通道条 +（可选）右侧效果器面板 */
 .mixer-slot {
+    position: relative;
     display: flex;
     gap: 8px;
     flex: 0 0 auto;
@@ -336,6 +379,139 @@
     height: 100%;
     /* 拖动排序时，被跨过的槽位靠它滑到新位置（被拖的那条在拖动期间临时关掉） */
     transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ===== 分组 ===== */
+
+/* 分组名：写在通道条上方留出的那条余量里，从组首左对齐。
+   做成一枚小标签，底色就是组色本身，字色按底色亮度取深 / 浅，两个主题下都读得出来 */
+.mixer-group-name {
+    position: absolute;
+    top: -19px;
+    left: 6px;
+    height: 16px;
+    max-width: 180px;
+    padding: 0 5px;
+    border-radius: 5px;
+    background: var(--strip-tint);
+    color: rgb(var(--strip-ink-rgb));
+    display: flex;
+    align-items: center;
+    font-size: 10px;
+    line-height: 1;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+
+.mixer-group-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: text;
+    transition: opacity 0.16s;
+}
+
+/* 组名前面那枚色块：底色就是组色，靠 ink 描边在组色底上勾出轮廓，点开换色 */
+.mixer-group-swatch {
+    flex: 0 0 auto;
+    width: 9px;
+    height: 9px;
+    margin-right: 4px;
+    padding: 0;
+    border: none;
+    border-radius: 2.5px;
+    box-shadow:
+        inset 0 0 0 1.5px rgba(var(--strip-ink-rgb), 0.5),
+        0 0 0 1px rgba(var(--strip-ink-rgb), 0.16);
+    cursor: pointer;
+    transition: transform 0.14s;
+}
+
+.mixer-group-swatch:hover {
+    transform: scale(1.22);
+}
+
+/* 换色面板：浮层，钉死不透明表面色，不继承通道的 ink 变量 */
+.mixer-group-colors {
+    position: absolute;
+    top: 20px;
+    left: 0;
+    width: 176px;
+    padding: 7px;
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 5px;
+    border-radius: 11px;
+    background: #222228;
+    box-shadow: 0 16px 38px rgba(0, 0, 0, 0.55);
+    z-index: 40;
+    cursor: default;
+}
+
+html.light .mixer-group-colors {
+    background: #ffffff;
+    box-shadow: 0 16px 38px rgba(0, 0, 0, 0.16);
+}
+
+.mixer-group-color {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    padding: 0;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: transform 0.12s;
+}
+
+.mixer-group-color:hover {
+    transform: scale(1.12);
+}
+
+.mixer-group-color.on {
+    box-shadow: 0 0 0 2px #ffffff, 0 0 0 3px rgba(0, 0, 0, 0.4);
+}
+
+html.light .mixer-group-color.on {
+    box-shadow: 0 0 0 2px #ffffff, 0 0 0 3px rgba(0, 0, 0, 0.25);
+}
+
+/* 打开换色面板的槽位要压在相邻槽位之上，否则面板会被后一条通道盖住 */
+.mixer-slot:has(.mixer-group-colors) {
+    z-index: 20;
+}
+
+.mixer-group-input {
+    width: 100%;
+    padding: 0 0 1px;
+    border: none;
+    border-bottom: 1px solid currentColor;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    outline: none;
+}
+
+/* 分隔线是 flex 流里的一个占位元素：宽度不大但真的占位，不会跟着被拖动的通道条跑；
+   上下各让出一点，不碰混音台的上边框与下边框 */
+.mixer-group-line {
+    flex: 0 0 12px;
+    align-self: stretch;
+    margin: -8px 0 8px;
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+}
+
+.mixer-group-line::before {
+    content: '';
+    width: 2px;
+    height: 100%;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.34);
+}
+
+html.light .mixer-group-line::before {
+    background: rgba(0, 0, 0, 0.3);
 }
 
 /* 路由连线覆盖层：盖在所有通道之上（含固定图层与拖动中的通道） */
@@ -379,7 +555,7 @@
     width: 104px;
     border-radius: 18px;
     border: 1px solid var(--border);
-    /* 上色后整条底色跟着走：--strip-tint-rgb 由组件按 channel.color 写入 */
+    /* 上色后的纯色底、字色与推子槽见下方 .tinted（变量由 tintStyle() 写入） */
     background: var(--surface);
     padding: 8px;
     gap: 8px;
@@ -388,11 +564,47 @@
     transition: border-color 0.16s, box-shadow 0.16s, opacity 0.2s, transform 0.18s;
 }
 
+/* 上色后整条底色就是色板里那个颜色本身：不叠主题表面色，暗 / 亮两个主题下看到的是同一个颜色。
+   通道内所有主题色在这里就地重定义成与底色对比的 ink，控件的背景用中性黑叠层，
+   这样不用逐个改子元素，选深色和选荧光色都读得出来 */
 .mixer-strip.tinted {
-    background:
-        linear-gradient(180deg, rgba(var(--strip-tint-rgb), 0.26), rgba(var(--strip-tint-rgb), 0.1) 62%, rgba(var(--strip-tint-rgb), 0.06)),
-        var(--surface);
-    border-color: rgba(var(--strip-tint-rgb), 0.45);
+    /* 纯色底 + 一层极轻的高光：色相永远是色板里选的那个，两个主题下完全一致 */
+    background-color: var(--strip-tint);
+    background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0) 46%, rgba(0, 0, 0, 0.05));
+    border-color: rgba(var(--strip-ink-rgb), 0.22);
+    color: rgb(var(--strip-ink-rgb));
+    --text: rgb(var(--strip-ink-rgb));
+    --text-muted: rgba(var(--strip-ink-rgb), 0.76);
+    --text-faint: rgba(var(--strip-ink-rgb), 0.56);
+    /* 控件玻璃跟着底色亮度走，不跟主题走：ink 本身就是「与底色相反」的那一端，
+       浅通道上控件自然压深一档、深通道上自然提亮一档，任何底色都有轮廓 */
+    --surface-2: rgba(var(--strip-ink-rgb), 0.15);
+    --surface-3: rgba(var(--strip-ink-rgb), 0.26);
+    --border: rgba(var(--strip-ink-rgb), 0.16);
+    --border-strong: rgba(var(--strip-ink-rgb), 0.28);
+    /* 选中 / 拖动的轮廓也走 ink：荧光绿压在彩色通道上会跳出来，
+       浅通道配深轮廓、深通道配浅轮廓，选中照样一眼看得出 */
+    --accent-rgb: var(--strip-ink-rgb);
+}
+
+/* 推子槽用 ink 半透明：浅底配深槽、深底配浅槽，荧光绿填充永远浮得起来 */
+.mixer-strip.tinted .strip-fader {
+    background: rgba(var(--strip-ink-rgb), 0.18);
+}
+
+/* 颜色盘是浮层，不能继承通道内的 ink 变量，否则会变成半透明、露出通道底色 */
+.strip-colors {
+    --text: #ffffff;
+    --surface-2: #2A2A33;
+    --surface-3: #3A3A45;
+    --border-strong: rgba(255, 255, 255, 0.16);
+}
+
+html.light .strip-colors {
+    --text: #1a1c22;
+    --surface-2: #ECEEF2;
+    --surface-3: #DEE1E7;
+    --border-strong: rgba(0, 0, 0, 0.14);
 }
 
 /* 静音或他人独奏时：整条变暗 */
@@ -410,8 +622,8 @@
     box-shadow: 0 12px 35px rgba(0, 0, 0, 0.6), 0 0 30px rgba(var(--accent-rgb), 0.28);
 }
 
-/* 按住 Ctrl：整条通道可以拖，边框先给个提示 */
-.mixer-strip.ctrl-ready {
+/* 按住 Shift：整条通道可以拖，边框先给个提示 */
+.mixer-strip.drag-ready {
     cursor: grab;
 }
 
@@ -421,18 +633,18 @@
     box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.6), 0 10px 26px rgba(var(--accent-rgb), 0.14);
 }
 
-.mixer-strip.selected.ctrl-ready {
+.mixer-strip.selected.drag-ready {
     box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.9), 0 0 26px rgba(var(--accent-rgb), 0.22);
 }
 
-/* Shift 多选模式：通道上的参数一律不响应，只有整条通道可以选中 */
+/* Ctrl 多选模式：通道上的参数一律不响应，只有整条通道可以选中 */
 .mixer-strip.select-mode {
     cursor: copy;
 }
 
-/* 按住 Ctrl / Shift：整条通道就是一个判定区——推子、声像、BYP/M/S、效果链按钮、路由圆点、
+/* 按住 Shift / Ctrl：整条通道就是一个判定区——推子、声像、BYP/M/S、效果链按钮、路由圆点、
    输入窗、改名、移除全部不响应，只剩「整体选中 / 整体拖动」 */
-.mixer-strip:is(.select-mode, .ctrl-ready) :is(
+.mixer-strip:is(.select-mode, .drag-ready) :is(
     .strip-dot,
     .strip-label,
     .strip-wave,
@@ -1105,7 +1317,7 @@
 }
 
 /* 面板也是通道本体的一部分：按住 Ctrl / Shift 时先给个光标提示 */
-.mixer-rack-shell.ctrl-ready {
+.mixer-rack-shell.drag-ready {
     cursor: grab;
 }
 
@@ -1114,7 +1326,7 @@
 }
 
 /* 按住 Ctrl 时整条通道（连同面板里的卡片）就是一个拖动把手：卡片内部控件一律不响应 */
-.mixer-rack-shell.ctrl-ready .effect-item > * {
+.mixer-rack-shell.drag-ready .effect-item > * {
     pointer-events: none;
 }
 

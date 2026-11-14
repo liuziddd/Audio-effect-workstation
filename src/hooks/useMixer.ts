@@ -28,10 +28,12 @@ export interface MixerChannel {
     groupId?: string;
 }
 
-/** 分组：一条分组就是「一组通道 + 一个统一颜色」 */
+/** 分组：一组连续通道 + 一个统一颜色 + 一个可改的名字 */
 export interface MixerGroup {
     id: string;
     color: string;
+    /** 显示在组首通道条上方的名字，点击即可改 */
+    name: string;
 }
 
 /** 通道间单向路由：from 的输出送到 to 的输入；线色跟着源通道颜色走 */
@@ -161,6 +163,68 @@ const renumber = (list: MixerChannel[]) =>
         channel.customLabel ? channel : { ...channel, label: `CH ${index + 1}` }
     ));
 
+/**
+ * 分组必须是一段连续的通道。排序、增删、拖动之后过一遍：
+ * 每组保留最长的一段连续成员，被拖散的其余成员退出分组并恢复默认颜色；
+ * 保留段不足两条时整组解散。
+ */
+const enforceGroupContinuity = (list: MixerChannel[]): MixerChannel[] => {
+    const members = new Map<string, number[]>();
+    list.forEach((channel, index) => {
+        if (!channel.groupId) return;
+        const seen = members.get(channel.groupId);
+        if (seen) seen.push(index);
+        else members.set(channel.groupId, [index]);
+    });
+
+    const leaving = new Set<number>();
+    for (const indexes of members.values()) {
+        // 切成连续段，留下最长的一段（一样长取靠左的）
+        let bestStart = 0;
+        let bestLength = 1;
+        let start = 0;
+        for (let i = 1; i <= indexes.length; i++) {
+            if (i < indexes.length && indexes[i] === indexes[i - 1] + 1) continue;
+            if (i - start > bestLength) {
+                bestStart = start;
+                bestLength = i - start;
+            }
+            start = i;
+        }
+        const from = bestLength >= 2 ? indexes[bestStart] : -1;
+        const to = bestLength >= 2 ? indexes[bestStart + bestLength - 1] : -1;
+        for (const index of indexes) {
+            if (index < from || index > to) leaving.add(index);
+        }
+    }
+
+    if (!leaving.size) return list;
+    return list.map((channel, index) => (
+        leaving.has(index) ? { ...channel, groupId: undefined, color: undefined } : channel
+    ));
+};
+
+/** 把一段通道按「留下的在前、退出的在后」重排，退出者恢复默认色 */
+const splitGroup = (
+    list: MixerChannel[],
+    groupId: string,
+    leaving: Set<string>,
+): MixerChannel[] => {
+    const members = list.filter((channel) => channel.groupId === groupId);
+    if (!members.length) return list;
+    const going = members.filter((channel) => leaving.has(channel.id));
+    if (!going.length) return list;
+    const staying = members.filter((channel) => !leaving.has(channel.id));
+    const dissolved = staying.length < 2;
+    const kept = dissolved ? staying.map((c) => ({ ...c, groupId: undefined, color: undefined })) : staying;
+    const ejected = going.map((c) => ({ ...c, groupId: undefined, color: undefined }));
+
+    const block = new Set(members.map((channel) => channel.id));
+    const firstIndex = list.findIndex((channel) => channel.id === members[0].id);
+    const rest = list.filter((channel) => !block.has(channel.id));
+    return [...rest.slice(0, firstIndex), ...kept, ...ejected, ...rest.slice(firstIndex)];
+};
+
 export const useMixer = (initialChannels = 8) => {
     const [channels, setChannels] = useState<MixerChannel[]>(() =>
         Array.from({ length: initialChannels }, (_, index) => createChannel(index, index))
@@ -182,6 +246,7 @@ export const useMixer = (initialChannels = 8) => {
     const buffersRef = useRef(new Map<string, AudioBuffer>());
     const masterGainRef = useRef<Tone.Gain | null>(null);
     const channelsRef = useRef(channels);
+    const groupsRef = useRef(groups);
     const effectCounterRef = useRef(0);
     const channelCounterRef = useRef(initialChannels);
 
@@ -195,6 +260,7 @@ export const useMixer = (initialChannels = 8) => {
     const updateIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     channelsRef.current = channels;
+    groupsRef.current = groups;
     loopRef.current = loop;
 
     const updatePosition = useCallback((time: number) => {
@@ -487,6 +553,7 @@ export const useMixer = (initialChannels = 8) => {
     /**
      * 拖动排序：把一组通道（多选时是整段）插到 targetId 之前，targetId 传 null 表示落到队尾；
      * 组内相对顺序不变，没改过名的通道编号跟着位置重排。
+     * 落点左右有同组邻居时，被拖进来的通道自动并入那个分组——拖进组就等于入组。
      */
     const moveChannels = useCallback((ids: string[], targetId: string | null) => {
         setChannels((previous) => {
@@ -498,37 +565,144 @@ export const useMixer = (initialChannels = 8) => {
             if (to < 0) return previous;
             const next = [...rest];
             next.splice(to, 0, ...moving);
-            // 顺序没变就不触发重渲染
-            if (next.every((channel, index) => channel.id === previous[index].id)) return previous;
+
+            // 拖进分组：原本不属于任何组的通道，落点左右有组员就并进那个组。
+            // 这一步必须排在连续性校验之前——否则被拖进组中间的那条会先把它后面的组员挤出去
+            const groups = new Map(groupsRef.current.map((group) => [group.id, group]));
+            let joined = false;
+            for (let index = 0; index < next.length; index += 1) {
+                const channel = next[index];
+                if (channel.groupId || !ids.includes(channel.id)) continue;
+                const before = next[index - 1]?.groupId;
+                const after = next[index + 1]?.groupId;
+                const groupId = before && before === after ? before : (before ?? after);
+                const group = groupId ? groups.get(groupId) : undefined;
+                if (!group) continue;
+                next[index] = { ...channel, groupId: group.id, color: group.color };
+                joined = true;
+            }
+
+            // 拖动会把同组通道拉散：散开的自动退出分组，颜色也跟着回默认
+            const ordered = enforceGroupContinuity(next);
+
+            // 顺序和分组都没变就不触发重渲染
+            if (
+                !joined
+                && ordered === next
+                && next.every((channel, index) => channel.id === previous[index].id)
+            ) {
+                return previous;
+            }
+            return renumber(ordered);
+        });
+    }, []);
+
+    /** 单条通道改颜色：属于分组时整组一起换色，点「默认」等于退出这个分组 */
+    const setChannelColor = useCallback((channelId: string, color: string | null) => {
+        setChannels((previous) => {
+            const target = previous.find((channel) => channel.id === channelId);
+            if (!target) return previous;
+            if (target.groupId) {
+                if (!color) return renumber(splitGroup(previous, target.groupId, new Set([channelId])));
+                return previous.map((channel) => (
+                    channel.groupId === target.groupId ? { ...channel, color } : channel
+                ));
+            }
+            return previous.map((channel) => (
+                channel.id === channelId ? { ...channel, color: color ?? undefined } : channel
+            ));
+        });
+        if (color) {
+            const groupId = channelsRef.current.find((channel) => channel.id === channelId)?.groupId;
+            if (!groupId) return;
+            setGroups((previous) => previous.map((group) => (
+                group.id === groupId ? { ...group, color } : group
+            )));
+        }
+    }, []);
+
+    /**
+     * 把选中的通道并成一个分组。非相邻的成员会被自动拉拢到最左那条的右边，连成一段，
+     * 这样分组两侧的分隔线才画得出来；组名自动排号，之后可以点着改。
+     */
+    const groupChannels = useCallback((ids: string[], color: string) => {
+        if (ids.length < 2) return;
+        const used = new Set(groupsRef.current.map((group) => group.name));
+        let serial = groupsRef.current.length + 1;
+        while (used.has(`分组 ${serial}`)) serial += 1;
+        const id = `g_${Date.now().toString(36)}`;
+        const name = `分组 ${serial}`;
+
+        setChannels((previous) => {
+            const members = previous.filter((channel) => ids.includes(channel.id));
+            if (members.length < 2) return previous;
+            const others = previous.filter((channel) => !ids.includes(channel.id));
+            const anchor = previous.findIndex((channel) => ids.includes(channel.id));
+            const insertAt = previous.slice(0, anchor).filter((channel) => !ids.includes(channel.id)).length;
+            const grouped = members.map((channel) => ({ ...channel, groupId: id, color }));
+            return renumber([...others.slice(0, insertAt), ...grouped, ...others.slice(insertAt)]);
+        });
+        setGroups((previous) => [...previous, { id, color, name }]);
+    }, []);
+
+    /** 把选中的通道并进已有分组：接到组尾之后，颜色跟组色；原本在别的组里的会一起搬过来 */
+    const joinGroup = useCallback((ids: string[], groupId: string) => {
+        setChannels((previous) => {
+            const group = groupsRef.current.find((item) => item.id === groupId);
+            if (!group) return previous;
+            const moving = previous.filter((channel) => ids.includes(channel.id) && channel.groupId !== groupId);
+            if (!moving.length) return previous;
+            const movingIds = new Set(moving.map((channel) => channel.id));
+            const lastMember = previous.reduce(
+                (last, channel, index) => (channel.groupId === groupId ? index : last),
+                -1,
+            );
+            if (lastMember < 0) return previous;
+            const insertAt = previous
+                .slice(0, lastMember + 1)
+                .filter((channel) => !movingIds.has(channel.id)).length;
+            const rest = previous.filter((channel) => !movingIds.has(channel.id));
+            const joined = moving.map((channel) => ({ ...channel, groupId, color: group.color }));
+            const next = [...rest];
+            next.splice(insertAt, 0, ...joined);
+            return renumber(enforceGroupContinuity(next));
+        });
+    }, []);
+
+    /** 解散分组：退出的通道移到组尾之外并恢复默认颜色；组里剩不到两条就整组解散 */
+    const ungroupChannels = useCallback((ids: string[]) => {
+        const leaving = new Set(ids);
+        setChannels((previous) => {
+            const affected = new Set(
+                previous
+                    .filter((channel) => channel.groupId && leaving.has(channel.id))
+                    .map((channel) => channel.groupId!),
+            );
+            if (!affected.size) return previous;
+            let next = previous;
+            for (const groupId of affected) next = splitGroup(next, groupId, leaving);
             return renumber(next);
         });
     }, []);
 
-    /** 单条通道改颜色；不属于任何分组时就只是它自己的颜色 */
-    const setChannelColor = useCallback((channelId: string, color: string | null) => {
-        setChannels((previous) => previous.map((channel) => (
-            channel.id === channelId
-                ? { ...channel, color: color ?? undefined, groupId: color ? channel.groupId : undefined }
-                : channel
+    const renameGroup = useCallback((groupId: string, name: string) => {
+        const trimmed = name.trim();
+        if (!trimmed) return;
+        setGroups((previous) => previous.map((group) => (
+            group.id === groupId ? { ...group, name: trimmed } : group
         )));
     }, []);
 
-    /** 把选中的通道并成一个分组，统一上色 */
-    const groupChannels = useCallback((ids: string[], color: string) => {
-        if (!ids.length) return;
-        const id = `g_${Date.now().toString(36)}`;
-        setGroups((previous) => [...previous, { id, color }]);
-        setChannels((previous) => previous.map((channel) => (
-            ids.includes(channel.id) ? { ...channel, groupId: id, color } : channel
-        )));
-    }, []);
-
-    /** 解散分组：颜色留下，分组关系去掉 */
-    const ungroupChannels = useCallback((ids: string[]) => {
-        setChannels((previous) => previous.map((channel) => (
-            ids.includes(channel.id) ? { ...channel, groupId: undefined } : channel
-        )));
-    }, []);
+    // 组里一个成员都不剩了（全被拖出去或删掉），分组记录跟着注销
+    useEffect(() => {
+        const alive = new Set(
+            channels.map((channel) => channel.groupId).filter((id): id is string => Boolean(id)),
+        );
+        setGroups((previous) => {
+            const next = previous.filter((group) => alive.has(group.id));
+            return next.length === previous.length ? previous : next;
+        });
+    }, [channels]);
 
     /** 固定 / 取消固定：已经全固定了就整组取消 */
     const togglePin = useCallback((ids: string[]) => {
@@ -551,7 +725,7 @@ export const useMixer = (initialChannels = 8) => {
     const removeChannel = useCallback((channelId: string) => {
         setChannels((previous) => {
             if (previous.length <= 1) return previous;
-            return renumber(previous.filter((channel) => channel.id !== channelId));
+            return renumber(enforceGroupContinuity(previous.filter((channel) => channel.id !== channelId)));
         });
     }, []);
 
@@ -783,7 +957,9 @@ export const useMixer = (initialChannels = 8) => {
         resetChannelLabel,
         setChannelColor,
         groupChannels,
+        joinGroup,
         ungroupChannels,
+        renameGroup,
         groups,
         pinnedIds,
         togglePin,

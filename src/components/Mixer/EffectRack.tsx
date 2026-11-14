@@ -14,7 +14,7 @@ interface EffectRackProps {
     onUpdateEffectShaperPoints: (effectId: string, points: ShaperPoint[]) => void;
     /** 复制拖拽落到本通道时的处理 */
     onCopyEffects: (effects: EffectConfig[], channelId: string, index: number) => void;
-    /** 按住了 Shift：链里的卡片只做多选 */
+    /** 按住了 Ctrl：链里的卡片只做多选 */
     selectMode: boolean;
     /** 动一下这个面板，就把侧栏效果器库的投放目标切到本通道 */
     onFocus: () => void;

@@ -8,6 +8,8 @@ interface WaveformProps {
     playing: boolean;
     /** 换文件 / 清空时重置画面 */
     resetKey: string;
+    /** 通道上色后波形改用与底色对比的墨色，否则琥珀色会糊在彩色底上 */
+    inkColor?: string;
 }
 
 /** 一行代表的时间 */
@@ -21,7 +23,7 @@ const CLIP_LEVEL = 0.999;
  * 每一行取分析器里真实采样的最大值与最小值，所以推子拉爆、效果器失真、
  * 削波平顶都会原样显示；暂停/停止后画面冻结，不播时保持空白。
  */
-export const Waveform = ({ analyser, playing, resetKey }: WaveformProps) => {
+export const Waveform = ({ analyser, playing, resetKey, inkColor }: WaveformProps) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const { isLight } = useThemeTokens();
     const ring = useRef({
@@ -48,7 +50,7 @@ export const Waveform = ({ analyser, playing, resetKey }: WaveformProps) => {
         let width = 0;
         let height = 0;
         let rowH = 1;
-        const ink = isLight ? '#D99300' : '#FFD23F';
+        const ink = inkColor ?? (isLight ? '#D99300' : '#FFD23F');
         const over = '#FF3B30';
 
         /** 同步画布像素尺寸；闭包里的 width/height 每次都跟着刷新，不能只在尺寸变化时赋值 */
@@ -140,7 +142,7 @@ export const Waveform = ({ analyser, playing, resetKey }: WaveformProps) => {
             cancelAnimationFrame(raf);
             observer.disconnect();
         };
-    }, [playing, analyser, isLight, ring]);
+    }, [playing, analyser, isLight, inkColor, ring]);
 
     return <canvas ref={canvasRef} />;
 };

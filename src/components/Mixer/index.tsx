@@ -3,7 +3,7 @@ import { flushSync } from 'react-dom';
 import { Download, Layers, Pause, Pin, Play, Plus, Repeat, Square } from 'lucide-react';
 import { MixerApi, MixerChannel } from '../../hooks/useMixer';
 import { startSweep } from '../../utils/sweepSelect';
-import { CHANNEL_COLORS, ChannelStrip } from './ChannelStrip';
+import { CHANNEL_COLORS, ChannelStrip, tintStyle } from './ChannelStrip';
 import { EffectRack } from './EffectRack';
 import './styles.css';
 
@@ -36,8 +36,8 @@ const GLIDE_MAX_SPEED = 4200;
 
 /** 卡片外面的快捷键说明：纯文字，之间用一条细竖线分开 */
 const SHORTCUTS = [
-    { key: 'Ctrl', label: '拖动通道' },
-    { key: 'Shift', label: '按住扫选多选' },
+    { key: 'Shift', label: '拖动通道' },
+    { key: 'Ctrl', label: '按住扫选多选' },
     { key: 'G', label: '分组上色' },
     { key: 'T', label: '固定到左侧' },
     { key: '双击数值', label: '直接输入' },
@@ -82,7 +82,8 @@ export const Mixer = ({ mixer }: { mixer: MixerApi }) => {
         insertEffectCopies, removeEffects, setEffectsEnabled, updateEffect,
         updateEffectEqBands, updateEffectShaperPoints, reorderEffects,
         getAnalyser, exportMix, hasAudio, addRoute, removeRoutesFrom, removeRoute,
-        setActiveChannelId, setChannelColor, groupChannels, ungroupChannels, pinnedIds, togglePin,
+        setActiveChannelId, setChannelColor, groupChannels, joinGroup, ungroupChannels, renameGroup, groups,
+        pinnedIds, togglePin,
     } = mixer;
 
     const wrapRef = useRef<HTMLDivElement>(null);
@@ -93,7 +94,7 @@ export const Mixer = ({ mixer }: { mixer: MixerApi }) => {
     const slotRefs = useRef(new Map<string, HTMLDivElement>());
     const scrubRef = useRef<HTMLDivElement>(null);
     const tempLineRef = useRef<SVGLineElement>(null);
-    /** 拖路由的起点：Shift 多选时一次带出整组 */
+    /** 拖路由的起点：Ctrl 多选时一次带出整组 */
     const dragFromRef = useRef<string[]>([]);
     const dragStartRef = useRef({ x: 0, y: 0 });
     /** 上一次「原地点击路由点」的通道与时间，用来判定双击 */
@@ -119,17 +120,34 @@ export const Mixer = ({ mixer }: { mixer: MixerApi }) => {
     const [exporting, setExporting] = useState(false);
     /** 导出文件名：留空就用默认的 mixdown_时间戳 */
     const [exportName, setExportName] = useState('');
-    /** 正在拉线的源通道：Shift 多选时是整组 */
+    /** 正在拉线的源通道：Ctrl 多选时是整组 */
     const [routeFromIds, setRouteFromIds] = useState<string[]>([]);
     const routeFrom = routeFromIds[0] ?? null;
     const [dragId, setDragId] = useState<string | null>(null);
     const [tempStart, setTempStart] = useState<Anchor | null>(null);
     /** 选中的通道：批量分组 / 固定 / 拖动都以它为准 */
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    /** 按住了 Ctrl（Mac 上 Cmd 同义）：通道参数锁定，只做整体选中 */
     const [ctrlDown, setCtrlDown] = useState(false);
-    /** 按住了 Shift：通道参数锁定，只做整体选中 */
+    /** 按住了 Shift：整条通道可拖动排序 */
     const [shiftDown, setShiftDown] = useState(false);
     const [groupOpen, setGroupOpen] = useState(false);
+    /** 正在改名的分组（草稿在输入框里，失焦才提交） */
+    const [groupRename, setGroupRename] = useState<{ id: string; draft: string } | null>(null);
+    /** 正在换颜色的分组：存组首通道 id，点外面收起 */
+    const [groupPalette, setGroupPalette] = useState<string | null>(null);
+    const groupPaletteRef = useRef<HTMLDivElement>(null);
+
+    // 换色面板：点面板外面收起
+    useEffect(() => {
+        if (!groupPalette) return;
+        const close = (event: PointerEvent) => {
+            if (groupPaletteRef.current?.contains(event.target as Node)) return;
+            setGroupPalette(null);
+        };
+        window.addEventListener('pointerdown', close);
+        return () => window.removeEventListener('pointerdown', close);
+    }, [groupPalette]);
     /** 固定图层宽度：滚动区要按它让出左侧空间 */
     const [pinnedWidth, setPinnedWidth] = useState(0);
 
@@ -145,6 +163,14 @@ export const Mixer = ({ mixer }: { mixer: MixerApi }) => {
 
     const pinnedChannels = useMemo(() => channels.filter((channel) => pinnedSetRef.current.has(channel.id)), [channels, pinnedKey]);
     const scrollChannels = useMemo(() => channels.filter((channel) => !pinnedSetRef.current.has(channel.id)), [channels, pinnedKey]);
+
+    /** 选中的通道是否已经同属一个分组：是的话按钮亮起该组色，再点一下就是退出分组 */
+    const selectedGroup = useMemo(() => {
+        const picked = channels.filter((channel) => selectedIds.includes(channel.id));
+        const first = picked[0]?.groupId;
+        if (!first || !picked.every((channel) => channel.groupId === first)) return null;
+        return groups.find((group) => group.id === first) ?? null;
+    }, [channels, groups, selectedIds]);
 
     // 导出：文件名留空时由 useMixer 生成默认名
     const runExport = async () => {
@@ -245,6 +271,16 @@ export const Mixer = ({ mixer }: { mixer: MixerApi }) => {
         toPinned: pinnedSetRef.current.has(route.to),
     })), [routes, pinnedKey, channels]);
     trailsRef.current = trails;
+
+    /** 组首通道条上要写分组名；同一组只在第一条上写一次 */
+    const groupHeadOf = (channel: MixerChannel) => {
+        if (!channel.groupId) return null;
+        const group = groups.find((item) => item.id === channel.groupId);
+        if (!group) return null;
+        const index = channels.findIndex((item) => item.id === channel.id);
+        if (index > 0 && channels[index - 1].groupId === channel.groupId) return null;
+        return group;
+    };
 
     /** 初始「波形 : 推子区」= 3 : 7：推子是主角，波形够看就行 */
     const sizedRef = useRef(false);
@@ -401,7 +437,7 @@ export const Mixer = ({ mixer }: { mixer: MixerApi }) => {
         return () => window.removeEventListener('resize', measure);
     }, [measure]);
 
-    /** 键盘：G 分组、T 固定、Ctrl 按住时整条通道可拖 */
+    /** 键盘：G 分组、T 固定、Shift 按住时整条通道可拖 */
     useEffect(() => {
         const typing = (target: EventTarget | null) =>
             Boolean((target as HTMLElement | null)?.closest?.('input, textarea, select, [contenteditable="true"]'));
@@ -468,7 +504,7 @@ export const Mixer = ({ mixer }: { mixer: MixerApi }) => {
 
     /**
      * 单击：收敛成只选这一条；它本来就是唯一选中时，再点一下就是取消（变成什么都不选）。
-     * Shift 单击是同一级的另一条路——按下那条当场切换、扫过哪条切哪条，见 handleChannelSelect。
+     * Ctrl 单击是同一级的另一条路——按下那条当场切换、扫过哪条切哪条，见 handleChannelSelect。
      */
     const selectChannel = (channelId: string) => {
         setActiveChannelId(channelId);
@@ -478,14 +514,14 @@ export const Mixer = ({ mixer }: { mixer: MixerApi }) => {
     /**
      * 按下一条通道。判定一律用**这次事件自己的修饰键**（`event.shiftKey` / `event.ctrlKey`），
      * 不用全局按键状态——状态万一没收到 keyup，也不会让点击永远走错分支。
-     * - Ctrl：整条通道（含展开的面板）就是一个拖动把手；先什么都不改，只按一下没拖才把它摘掉；
-     * - Shift：参数已锁定，只换选中；按住拖动会扫过整排通道，每条按自己的状态切换
+     * - Shift：整条通道（含展开的面板）就是一个拖动把手；先什么都不改，只按一下没拖才把它摘掉；
+     * - Ctrl（Mac 上 Cmd 同义）：参数已锁定，只换选中；按住拖动会扫过整排通道，每条按自己的状态切换
      *   （没选中→选上，已选中→取消），和单击同一级；
      * - 普通单击：收敛成只选这一条，它本来就是唯一选中时再点一下就是取消。
      */
     const handleChannelSelect = (channelId: string) => (event: React.PointerEvent) => {
-        const additive = event.shiftKey || event.metaKey;
-        if (event.ctrlKey || event.metaKey) {
+        const additive = event.ctrlKey || event.metaKey;
+        if (event.shiftKey) {
             if (selectedRef.current.includes(channelId)) {
                 // 按下即可能开始整段拖动：拖了就不动选中，只是点一下才取消它
                 const startX = event.clientX;
@@ -518,7 +554,7 @@ export const Mixer = ({ mixer }: { mixer: MixerApi }) => {
             selectChannel(channelId);
             return;
         }
-        // Shift：整条通道只是一个选项。按下那条当场切换，之后扫过哪条就切哪条——
+        // Ctrl：整条通道只是一个选项。按下那条当场切换，之后扫过哪条就切哪条——
         // 没选中的被选上、已选中的被取消，和单击同一套语义
         const working = new Set(selectedRef.current);
         startSweep(
@@ -586,12 +622,12 @@ export const Mixer = ({ mixer }: { mixer: MixerApi }) => {
     };
 
     /**
-     * 按住 Ctrl 拖动排序：被拖的通道（多选时整段）滑进目标空位，其它通道按实测矩形让位；
+     * 按住 Shift 拖动排序：被拖的通道（多选时整段）滑进目标空位，其它通道按实测矩形让位；
      * 拖动过程不改 React 顺序，松手才提交——所以不会因为 DOM 重排而跳，
      * 展开着效果器面板的宽槽位也能算准。
      */
     const startChannelDrag = (channelId: string) => (event: React.PointerEvent) => {
-        if (event.button !== 0 || !(event.ctrlKey || event.metaKey)) return;
+        if (event.button !== 0 || !event.shiftKey) return;
         const ids = selectedRef.current.includes(channelId) ? [...selectedRef.current] : [channelId];
         const idSet = new Set(ids);
         // 只在同一层里排：固定通道与滚动通道互不干扰
@@ -746,7 +782,7 @@ export const Mixer = ({ mixer }: { mixer: MixerApi }) => {
         const wrap = wrapRef.current;
         const dot = stripRefs.current.get(channelId)?.querySelector('.strip-route-dot');
         if (!wrap || !dot) return;
-        // Shift 多选时一次带出整组，落点会同时给它们各建一条线
+        // Ctrl 多选时一次带出整组，落点会同时给它们各建一条线
         const ids = selectedRef.current.length > 1 && selectedRef.current.includes(channelId)
             ? selectedRef.current
             : [channelId];
@@ -831,10 +867,17 @@ export const Mixer = ({ mixer }: { mixer: MixerApi }) => {
         setGroupOpen(false);
     };
 
+    const applyJoin = (groupId: string) => {
+        joinGroup(selectedIds, groupId);
+        setGroupOpen(false);
+    };
+
     /** 正在拉线时的临时线色：跟着源通道颜色，没上色就交给 CSS */
     const routeTint = routeFrom ? colorOf(routeFrom) : undefined;
 
-    const renderSlot = (channel: MixerChannel) => (
+    const renderSlot = (channel: MixerChannel) => {
+        const head = groupHeadOf(channel);
+        return (
         <div
             className="mixer-slot"
             key={channel.id}
@@ -844,13 +887,13 @@ export const Mixer = ({ mixer }: { mixer: MixerApi }) => {
                 const target = event.target as HTMLElement;
                 // 通道条自己那一层已经在处理了
                 if (target.closest('.mixer-strip')) return;
-                // Ctrl：整条槽位（含展开的面板与里面的卡片）都是一个拖动把手
-                if (ctrlDown) {
+                // Shift：整条槽位（含展开的面板与里面的卡片）都是一个拖动把手
+                if (shiftDown) {
                     handleChannelSelect(channel.id)(event);
                     startChannelDrag(channel.id)(event);
                     return;
                 }
-                // Shift：面板的标题栏、留白、卡片间隙算通道本体；卡片本身归卡片（整卡多选）
+                // Ctrl：面板的标题栏、留白、卡片间隙算通道本体；卡片本身归卡片（整卡多选）
                 if (target.closest('.effect-item')) return;
                 handleChannelSelect(channel.id)(event);
             }}
@@ -859,6 +902,72 @@ export const Mixer = ({ mixer }: { mixer: MixerApi }) => {
                 else slotRefs.current.delete(channel.id);
             }}
         >
+            {head && (
+                <div className="mixer-group-name" style={tintStyle(head.color)}>
+                    {/* 组色小方块：点开就地换整组颜色 */}
+                    <button
+                        className="mixer-group-swatch"
+                        style={{ background: head.color }}
+                        title="换分组颜色"
+                        onPointerDown={(event) => {
+                            if (ctrlDown || shiftDown) return;
+                            event.stopPropagation();
+                        }}
+                        onClick={(event) => {
+                            event.stopPropagation();
+                            setGroupRename(null);
+                            setGroupPalette((open) => (open === channel.id ? null : channel.id));
+                        }}
+                    />
+                    {groupRename?.id === head.id ? (
+                        <input
+                            className="mixer-group-input"
+                            autoFocus
+                            value={groupRename.draft}
+                            spellCheck={false}
+                            onChange={(event) => setGroupRename({ id: head.id, draft: event.target.value })}
+                            onFocus={(event) => event.currentTarget.select()}
+                            onPointerDown={(event) => event.stopPropagation()}
+                            onBlur={() => {
+                                renameGroup(head.id, groupRename.draft);
+                                setGroupRename(null);
+                            }}
+                            onKeyDown={(event) => {
+                                if (event.key === 'Enter') event.currentTarget.blur();
+                                if (event.key === 'Escape') setGroupRename(null);
+                            }}
+                        />
+                    ) : (
+                        <span
+                            className="mixer-group-label"
+                            title={`${head.name} · 单击改名`}
+                            onPointerDown={(event) => {
+                                // 修饰键下把事件让给整条通道（选中 / 拖动），名字不拦
+                                if (ctrlDown || shiftDown) return;
+                                event.stopPropagation();
+                            }}
+                            onClick={() => setGroupRename({ id: head.id, draft: head.name })}
+                        >
+                            {head.name}
+                        </span>
+                    )}
+                    {groupPalette === channel.id && (
+                        <div className="mixer-group-colors" ref={groupPaletteRef}>
+                            {CHANNEL_COLORS.map((color) => (
+                                <button
+                                    key={color}
+                                    className={`mixer-group-color ${head.color === color ? 'on' : ''}`}
+                                    style={{ background: color }}
+                                    onClick={() => {
+                                        setChannelColor(channel.id, color);
+                                        setGroupPalette(null);
+                                    }}
+                                />
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
             <ChannelStrip
                 stripRef={(node) => {
                     if (node) stripRefs.current.set(channel.id, node);
@@ -875,8 +984,8 @@ export const Mixer = ({ mixer }: { mixer: MixerApi }) => {
                 routeTarget={isRouteTarget(channel.id)}
                 dragging={dragId !== null && (dragId === channel.id || selectedIds.includes(channel.id))}
                 selected={selectedIds.includes(channel.id)}
-                ctrlReady={ctrlDown}
-                selectMode={shiftDown}
+                dragReady={shiftDown}
+                selectMode={ctrlDown}
                 pinned={pinnedSetRef.current.has(channel.id)}
                 incoming={incomingOf(channel.id)}
                 onSelect={handleChannelSelect(channel.id)}
@@ -895,7 +1004,7 @@ export const Mixer = ({ mixer }: { mixer: MixerApi }) => {
                 onRemoveRoute={(from) => removeRoute(from, channel.id)}
             />
             {expandedIds.includes(channel.id) && (
-                <div className={`mixer-rack-shell ${openingIds.includes(channel.id) ? 'is-opening' : ''} ${ctrlDown ? 'ctrl-ready' : ''} ${shiftDown ? 'select-mode' : ''}`}>
+                <div className={`mixer-rack-shell ${openingIds.includes(channel.id) ? 'is-opening' : ''} ${shiftDown ? 'drag-ready' : ''} ${ctrlDown ? 'select-mode' : ''}`}>
                     <EffectRack
                         channel={channel}
                         onClose={() => setExpandedIds((previous) => previous.filter((id) => id !== channel.id))}
@@ -906,13 +1015,34 @@ export const Mixer = ({ mixer }: { mixer: MixerApi }) => {
                         onUpdateEffectEqBands={(effectId, bands) => updateEffectEqBands(channel.id, effectId, bands)}
                         onUpdateEffectShaperPoints={(effectId, points) => updateEffectShaperPoints(channel.id, effectId, points)}
                         onCopyEffects={(effects, targetChannel, targetIndex) => insertEffectCopies(targetChannel, effects, targetIndex)}
-                        selectMode={shiftDown}
+                        selectMode={ctrlDown}
                         onFocus={() => setActiveChannelId(channel.id)}
                     />
                 </div>
             )}
         </div>
-    );
+        );
+    };
+
+    /**
+     * 一排通道条 + 分组分隔线。线是 flex 流里的独立占位元素，不跟着被拖动的通道条走，
+     * 也自然把两侧通道撑开；两侧分组状态不同的交界只画一条（组的右边界与下一组的左边界合一），
+     * 层的首尾各自补齐组的另一侧。
+     */
+    const renderRow = (list: MixerChannel[]) => {
+        const nodes: React.ReactNode[] = [];
+        list.forEach((channel, index) => {
+            const previous = list[index - 1];
+            const edgeHere = previous
+                ? previous.groupId !== channel.groupId && Boolean(previous.groupId || channel.groupId)
+                : Boolean(channel.groupId);
+            if (edgeHere) nodes.push(<div className="mixer-group-line" key={`edge-${channel.id}`} />);
+            nodes.push(renderSlot(channel));
+        });
+        const last = list[list.length - 1];
+        if (last?.groupId) nodes.push(<div className="mixer-group-line" key={`edge-${last.id}-end`} />);
+        return nodes;
+    };
 
     return (
         <div className="mixer-shell">
@@ -946,10 +1076,25 @@ export const Mixer = ({ mixer }: { mixer: MixerApi }) => {
 
                         {/* 分组 / 固定：作用于当前选中的通道 */}
                         <button
-                            className={`mixer-btn compact ${groupOpen ? 'on' : ''}`}
-                            onClick={() => setGroupOpen((open) => !open)}
+                            className={`mixer-btn compact ${selectedGroup ? 'is-grouped' : groupOpen ? 'on' : ''}`}
+                            onClick={() => {
+                                // 选中的已经同属一组：按钮就是退出分组的开关
+                                if (selectedGroup) {
+                                    ungroupChannels(selectedIds);
+                                    setGroupOpen(false);
+                                    return;
+                                }
+                                setGroupOpen((open) => !open);
+                            }}
                             disabled={!selectedIds.length}
-                            title="把选中的通道并成一个分组（G）"
+                            style={selectedGroup ? {
+                                color: selectedGroup.color,
+                                borderColor: `${selectedGroup.color}80`,
+                                background: `${selectedGroup.color}1f`,
+                            } : undefined}
+                            title={selectedGroup
+                                ? `${selectedGroup.name} · 点击退出分组（G）`
+                                : '分组上色；也可把通道直接拖进已有分组（G）'}
                         >
                             <Layers className="w-3.5 h-3.5" />
                         </button>
@@ -957,34 +1102,46 @@ export const Mixer = ({ mixer }: { mixer: MixerApi }) => {
                             className={`mixer-btn compact ${selectedIds.length && selectedIds.every((id) => pinnedSetRef.current.has(id)) ? 'on' : ''}`}
                             onClick={() => togglePin(selectedIds)}
                             disabled={!selectedIds.length}
-                            title="把选中的通道固定在左侧（T）"
+                            title="把选中的通道固定在左侧，已固定时再按取消（T）"
                         >
                             <Pin className="w-3.5 h-3.5" />
                         </button>
 
                         {groupOpen && (
                             <div className="mixer-palette">
-                                <span className="mixer-palette-head">分组颜色</span>
+                                <span className="mixer-palette-head">
+                                    {selectedIds.length > 1 ? '新建分组' : '选中两条以上新建分组'}
+                                </span>
                                 <div className="mixer-palette-grid">
                                     {CHANNEL_COLORS.map((color) => (
                                         <button
                                             key={color}
                                             className="mixer-palette-dot"
                                             style={{ background: color }}
+                                            disabled={selectedIds.length < 2}
                                             onClick={() => applyGroup(color)}
                                         />
                                     ))}
                                 </div>
-                                {selectedIds.some((id) => channels.find((channel) => channel.id === id)?.groupId) && (
-                                    <button
-                                        className="mixer-palette-reset"
-                                        onClick={() => {
-                                            ungroupChannels(selectedIds);
-                                            setGroupOpen(false);
-                                        }}
-                                    >
-                                        取消分组
-                                    </button>
+                                {groups.length > 0 && (
+                                    <>
+                                        <span className="mixer-palette-head is-section">加入已有分组</span>
+                                        <div className="mixer-palette-groups">
+                                            {groups.map((group) => (
+                                                <button
+                                                    key={group.id}
+                                                    className="mixer-palette-group"
+                                                    onClick={() => applyJoin(group.id)}
+                                                >
+                                                    <span
+                                                        className="mixer-palette-swatch"
+                                                        style={{ background: group.color }}
+                                                    />
+                                                    <span className="mixer-palette-name">{group.name}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </>
                                 )}
                             </div>
                         )}
@@ -1049,7 +1206,7 @@ export const Mixer = ({ mixer }: { mixer: MixerApi }) => {
                     {/* 固定图层：盖在滚动区左侧，像一块独立的板 */}
                     {pinnedChannels.length > 0 && (
                         <div className="mixer-pinned" ref={pinnedRef}>
-                            {pinnedChannels.map(renderSlot)}
+                            {renderRow(pinnedChannels)}
                         </div>
                     )}
 
@@ -1063,7 +1220,7 @@ export const Mixer = ({ mixer }: { mixer: MixerApi }) => {
                         }}
                         style={pinnedChannels.length ? { paddingLeft: pinnedWidth + 8 } : undefined}
                     >
-                        {scrollChannels.map(renderSlot)}
+                        {renderRow(scrollChannels)}
 
                         <button className="mixer-add" onClick={addChannel} title="新增通道">
                             <Plus className="w-4 h-4" />

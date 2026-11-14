@@ -10,7 +10,7 @@ interface EffectChainProps {
     channelId: string;
     effects: EffectConfig[];
     onReorderEffects: (effects: EffectConfig[]) => void;
-    /** 删除：Shift 多选时一次删掉整组 */
+    /** 删除：Ctrl 多选时一次删掉整组 */
     onRemoveEffects: (effectIds: string[]) => void;
     /** 开关：多选时整组同步成同一个状态 */
     onSetEffectsEnabled: (effectIds: string[], enabled: boolean) => void;
@@ -21,7 +21,7 @@ interface EffectChainProps {
     onCopyEffects: (effects: EffectConfig[], channelId: string, index: number) => void;
     /** 抽屉里由外层提供标题时关掉内建表头 */
     showHeader?: boolean;
-    /** 按住了 Shift：整张卡片只是一个选项，内部控件全部锁住 */
+    /** 按住了 Ctrl：整张卡片只是一个选项，内部控件全部锁住 */
     selectMode?: boolean;
 }
 
@@ -38,7 +38,7 @@ export const EffectChain: React.FC<EffectChainProps> = ({
     showHeader = true,
     selectMode = false,
 }) => {
-    /** Shift 选中的效果器：同名参数可以一起调，开关 / 展开 / 删除 / 复制也整组生效 */
+    /** Ctrl 选中的效果器：同名参数可以一起调，开关 / 展开 / 删除 / 复制也整组生效 */
     const [selected, setSelected] = useState<string[]>([]);
     /** 展开参数的效果器：提升到这里，多选时才能一起展开 / 收起 */
     const [expanded, setExpanded] = useState<string[]>([]);
@@ -63,14 +63,14 @@ export const EffectChain: React.FC<EffectChainProps> = ({
 
     /**
      * 和通道条同一套：单击收敛成只选这一张，它本来就是唯一选中时再点一下 = 取消。
-     * Shift 单击是同一级的另一条路——按下那张当场切换、扫过哪张切哪张，见 sweepFrom。
+     * Ctrl 单击是同一级的另一条路——按下那张当场切换、扫过哪张切哪张，见 sweepFrom。
      */
     const toggleSelect = (effectId: string) => {
         setSelected((previous) => (previous.length === 1 && previous[0] === effectId ? [] : [effectId]));
     };
 
     /**
-     * 按住 Shift 按下某张卡片：整张卡片只是一个选项。按下那张当场切换，之后扫过哪张
+     * 按住 Ctrl 按下某张卡片：整张卡片只是一个选项。按下那张当场切换，之后扫过哪张
      * 就切哪张——没选中的被选上、已选中的被取消，和通道条同一套、也和单击同一级。
      */
     const sweepFrom = (effectId: string) => (event: React.PointerEvent) => {

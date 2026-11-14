@@ -15,8 +15,8 @@
     --glass-strong: rgba(14, 14, 20, 0.16);
     --glass-panel: rgba(14, 14, 20, 0.34);
     --surface: #1A1A20;
-    --surface-2: #222228;
-    --surface-3: #2C2C34;
+    --surface-2: #2A2A33;
+    --surface-3: #3A3A45;
     /* 荧光绿：编辑页所有按钮 / 可点区域的统一强调色 */
     --accent: #A6FF00;
     --accent-2: #C6FF4D;
@@ -46,8 +46,8 @@ html.light {
     --glass-strong: rgba(255, 255, 255, 0.42);
     --glass-panel: rgba(255, 255, 255, 0.6);
     --surface: #ffffff;
-    --surface-2: #f2f3f5;
-    --surface-3: #e4e6ea;
+    --surface-2: #eceef2;
+    --surface-3: #dee1e7;
     /* 亮色主题的强调色与暗色完全一致：荧光绿不随主题变色。
        只有「直接用强调色写字」的地方改走 *-text，否则白底上看不见 */
     --accent: #A6FF00;
