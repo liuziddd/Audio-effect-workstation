@@ -4,7 +4,12 @@ import { useEffect, useState } from 'react';
 const read = (name: string, fallback: string): string =>
     getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 
+/** 画布 / SVG 里要拿真实色值时用这个（读不到就退回暗色主题的强调色） */
+export const themeColor = (name: string, fallback: string): string => read(name, fallback);
+
 export interface ThemeTokens {
+    /** 当前是否为亮色主题 */
+    isLight: boolean;
     /** 画布底色 */
     canvas: string;
     /** 主网格线（轴线 / 0dB） */
@@ -24,6 +29,7 @@ export interface ThemeTokens {
 }
 
 const readTokens = (): ThemeTokens => ({
+    isLight: document.documentElement.classList.contains('light'),
     canvas: read('--surface', '#1A1A20'),
     grid: read('--surface-3', '#2C2C34'),
     gridSoft: read('--surface-2', '#222228'),

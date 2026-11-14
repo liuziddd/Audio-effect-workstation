@@ -1,5 +1,5 @@
 /**
- * 浏览器端模型下载：多源回退 + Range 分片 + Cache API 分片级断点续传 + 完整性校验。
+ * 浏览器端模型下载：国内 CDN 优先 + 多源回退 + Range 分片 + Cache API 分片级断点续传 + 完整性校验。
  * AI 音轨分离（HTDemucs）与 AI 神经母带（ITO-Master）共用同一套基础设施。
  */
 export interface ModelFileSpec {
@@ -23,20 +23,16 @@ const CHUNK_RETRY = 3;
 /** 固定 8MB 分片：单片失败只丢 8MB，中断后恢复粒度更细 */
 const CHUNK_BYTES = 8 * 1024 * 1024;
 
-/** 可选：ModelScope 公开仓库 ID，配置后自动作为首选国内源 */
-const SCOPE_REPO = (import.meta.env.VITE_MODELSCOPE_REPO as string | undefined)?.trim() ?? '';
-
 /**
+ * 首选源：自托管在 ModelScope 的公开仓库，走境内 CDN（302 跳 cdn-lfs-cn-1.modelscope.cn）。
  * 必须用 `models/{repo}/resolve/` 形式：`api/v1/models/{repo}/repo?FilePath=` 的 302
  * 不带 Access-Control-Allow-Origin，浏览器会直接拦掉重定向（表现为 302 后拿不到数据）。
  */
+const SCOPE_BASE = 'https://www.modelscope.cn/models/NiYoxq/audio-models/resolve/master/';
+
 const sourcesOf = (spec: ModelFileSpec): string[] => {
-    if (!SCOPE_REPO) return spec.urls;
     const name = spec.urls[0].split('/').pop()!;
-    return [
-        `https://www.modelscope.cn/models/${SCOPE_REPO}/resolve/master/${encodeURIComponent(name)}`,
-        ...spec.urls,
-    ];
+    return [`${SCOPE_BASE}${encodeURIComponent(name)}`, ...spec.urls];
 };
 
 const partKey = (key: string, index: number) => `${key}.part-v2-${index}`;
@@ -47,33 +43,6 @@ const clearParts = async (cache: Cache, key: string) => {
     await Promise.all(
         requests.filter((r) => r.url.includes(`${key}.part-`)).map((r) => cache.delete(r)),
     );
-};
-
-/** 单流读取（服务端不支持 Range 时的兜底） */
-const readStream = async (res: Response, onProgress: (loaded: number, total: number) => void) => {
-    const total = Number(res.headers.get('content-length')) || 0;
-    if (!res.body) {
-        const buffer = new Uint8Array(await res.arrayBuffer());
-        onProgress(buffer.byteLength, total || buffer.byteLength);
-        return buffer;
-    }
-    const reader = res.body.getReader();
-    const chunks: Uint8Array[] = [];
-    let loaded = 0;
-    for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value);
-        loaded += value.length;
-        onProgress(loaded, total);
-    }
-    const buffer = new Uint8Array(loaded);
-    let offset = 0;
-    for (const chunk of chunks) {
-        buffer.set(chunk, offset);
-        offset += chunk.length;
-    }
-    return buffer;
 };
 
 /** 按 expectedBytes 切分 Range；每个分片下完立即写入 Cache，中断后只补缺片 */
@@ -113,7 +82,6 @@ const downloadParallel = async (
         for (let attempt = 0; attempt < CHUNK_RETRY; attempt++) {
             try {
                 const res = await fetch(url, { headers: { Range: `bytes=${start}-${end}` } });
-                if (res.status === 200) throw new Error('RANGE_UNSUPPORTED');
                 if (res.status !== 206) continue;
                 const data = new Uint8Array(await res.arrayBuffer());
                 if (data.byteLength !== want) continue;
@@ -122,9 +90,8 @@ const downloadParallel = async (
                 loaded += data.byteLength;
                 onProgress(loaded, total);
                 return true;
-            } catch (error) {
-                // 服务端完全不支持 Range 时立即交给单流兜底；其余失败只重试本片
-                if (error instanceof Error && error.message === 'RANGE_UNSUPPORTED') throw error;
+            } catch {
+                // 单片失败只重试本片
             }
         }
         return false;
@@ -178,15 +145,7 @@ export const loadModelFile = async (
 
     for (const url of sourcesOf(spec)) {
         try {
-            let bytes: Uint8Array;
-            try {
-                bytes = await downloadParallel(cache, spec, url, onProgress);
-            } catch (error) {
-                if (!(error instanceof Error && error.message === 'RANGE_UNSUPPORTED')) throw error;
-                const res = await fetch(url);
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                bytes = await readStream(res, onProgress);
-            }
+            const bytes = await downloadParallel(cache, spec, url, onProgress);
             if (bytes.byteLength < spec.minBytes) throw new Error('模型数据不完整');
             await cache.put(spec.key, new Response(bytes));
             await clearParts(cache, spec.key);

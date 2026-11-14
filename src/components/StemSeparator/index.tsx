@@ -195,7 +195,7 @@ const StemSeparator: React.FC = () => {
                         status={phase}
                         label="音轨分离"
                         doneLabel="分离完成"
-                        color="#7B9CFF"
+                        color="var(--accent-text)"
                         doneColor="#A6FF00"
                     />
                     {phase === 'working' && (

@@ -14,7 +14,7 @@ export interface SpectrumBand {
     level: number;  // 幅值 dB
 }
 
-export interface AudioMetrics {
+interface AudioMetrics {
     duration: number;
     sampleRate: number;
     channels: number;
@@ -305,7 +305,7 @@ export const analyzeAudio = (buffer: AudioBuffer): AnalysisResult => {
 
 export type Grade = 'good' | 'ok' | 'warn' | 'bad';
 
-export interface EvaluationItem {
+interface EvaluationItem {
     label: string;
     value: string;
     grade: Grade;

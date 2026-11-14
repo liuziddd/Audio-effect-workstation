@@ -10,7 +10,7 @@ import MasterAnalysisWorker from '../workers/masterAnalysis.worker?worker';
 import type { SegmentStats } from './masterAnalysis';
 import type { Stem } from './loudness';
 
-export interface MasterMetrics {
+interface MasterMetrics {
     lufs: number;
     peakDb: number;
     crestDb: number;

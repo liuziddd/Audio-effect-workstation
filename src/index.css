@@ -11,13 +11,27 @@
     --text-faint: #707070;
     --border: rgba(255, 255, 255, 0.10);
     --border-strong: rgba(255, 255, 255, 0.16);
-    --glass: rgba(20, 20, 26, 0.58);
-    --glass-strong: rgba(20, 20, 26, 0.55);
-    --glass-frost: rgba(255, 255, 255, 0.08);
+    --glass: rgba(14, 14, 20, 0.14);
+    --glass-strong: rgba(14, 14, 20, 0.16);
+    --glass-panel: rgba(14, 14, 20, 0.34);
     --surface: #1A1A20;
     --surface-2: #222228;
     --surface-3: #2C2C34;
-    --accent: #2450FF;
+    /* 荧光绿：编辑页所有按钮 / 可点区域的统一强调色 */
+    --accent: #A6FF00;
+    --accent-2: #C6FF4D;
+    --accent-3: #E2FFA0;
+    /* 填上强调色的按钮上的字色（亮绿底必须压深色字） */
+    --accent-ink: #0A1400;
+    --accent-rgb: 166, 255, 0;
+    --accent-2-rgb: 198, 255, 77;
+    --accent-3-rgb: 226, 255, 160;
+    /* Canvas 里要实体色值，专门留一个低透明度的强调色 */
+    --accent-soft: rgba(166, 255, 0, 0.12);
+    /* 强调色当文字色时用这三个：暗色下与 --accent 完全相同 */
+    --accent-text: #A6FF00;
+    --accent-2-text: #C6FF4D;
+    --accent-3-text: #E2FFA0;
 }
 
 html.light {
@@ -28,13 +42,29 @@ html.light {
     --text-faint: #8a8f98;
     --border: rgba(0, 0, 0, 0.08);
     --border-strong: rgba(0, 0, 0, 0.14);
-    --glass: rgba(255, 255, 255, 0.72);
-    --glass-strong: rgba(255, 255, 255, 0.85);
-    --glass-frost: rgba(255, 255, 255, 0.5);
+    --glass: rgba(255, 255, 255, 0.34);
+    --glass-strong: rgba(255, 255, 255, 0.42);
+    --glass-panel: rgba(255, 255, 255, 0.6);
     --surface: #ffffff;
     --surface-2: #f2f3f5;
     --surface-3: #e4e6ea;
-    --accent: #2450FF;
+    /* 亮色主题的强调色与暗色完全一致：荧光绿不随主题变色。
+       只有「直接用强调色写字」的地方改走 *-text，否则白底上看不见 */
+    --accent: #A6FF00;
+    --accent-2: #C6FF4D;
+    --accent-3: #E2FFA0;
+    --accent-ink: #0A1400;
+    --accent-rgb: 166, 255, 0;
+    --accent-2-rgb: 198, 255, 77;
+    --accent-3-rgb: 226, 255, 160;
+    --accent-soft: rgba(166, 255, 0, 0.12);
+}
+
+/* 亮色：同样荧光绿的填充色，字换成同色系深绿才读得出来 */
+html.light {
+    --accent-text: #4A8A00;
+    --accent-2-text: #548F00;
+    --accent-3-text: #63991E;
 }
 
 @layer base {
@@ -45,7 +75,7 @@ html.light {
     @supports (scrollbar-width: thin) {
         * {
             scrollbar-width: thin;
-            scrollbar-color: #2450FF rgba(255, 255, 255, 0.05);
+            scrollbar-color: var(--accent-text) rgba(255, 255, 255, 0.05);
         }
     }
 
@@ -54,63 +84,35 @@ html.light {
         margin: 0;
         padding: 0;
         min-height: 100vh;
-        overflow-x: hidden;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
         background: var(--bg);
         color: var(--text);
     }
+
+    /* 横向溢出由各页自己的根容器裁剪（首页 .home-root 不裁剪，编辑页 overflow-x-hidden），
+       html/body 一旦设 overflow，Chrome 里首页的 position: sticky 锚定会整体失效 */
 }
 
 @layer components {
-    .neon-button {
-        @apply relative px-6 py-3 bg-transparent border-2 rounded-lg font-semibold transition-all duration-300 ease-out;
-        @apply hover:shadow-neon active:scale-95;
-    }
-
-    .neon-button-blue {
-        @apply border-neon-blue text-neon-blue hover:bg-neon-blue hover:text-black;
-    }
-
-    .neon-button-purple {
-        @apply border-neon-purple text-neon-purple hover:bg-neon-purple hover:text-black;
-    }
-
-    .neon-button-green {
-        @apply border-neon-green text-neon-green hover:bg-neon-green hover:text-black;
-    }
-
-    .neon-button-orange {
-        @apply border-neon-orange text-neon-orange hover:bg-neon-orange hover:text-black;
-    }
-
     ::-webkit-scrollbar {
         width: 12px;
     }
 
     ::-webkit-scrollbar-track {
         background: rgba(255, 255, 255, 0.05);
-        border-radius: 6px;
+        border-radius: 9px;
     }
 
     ::-webkit-scrollbar-thumb {
-        background: linear-gradient(135deg, #2450FF 0%, #5B7BFF 100%);
-        border-radius: 6px;
+        background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+        border-radius: 9px;
         border: 2px solid transparent;
         -webkit-background-clip: content-box;
         background-clip: content-box;
     }
 
     ::-webkit-scrollbar-thumb:hover {
-        background: linear-gradient(135deg, #7B9CFF 0%, #2450FF 100%);
-    }
-
-    .drop-zone {
-        @apply border-2 border-dashed border-gray-600 rounded-3xl p-8;
-        @apply bg-dark-surface hover:border-neon-blue transition-all duration-300;
-    }
-
-    .drop-zone.drag-over {
-        @apply border-neon-blue bg-neon-blue bg-opacity-10;
+        background: linear-gradient(135deg, var(--accent-3) 0%, var(--accent) 100%);
     }
 }
 
@@ -124,7 +126,7 @@ input[type="range"]::-webkit-slider-track {
 
 input[type="range"]::-webkit-slider-thumb {
     @apply appearance-none w-4 h-4 rounded-full cursor-pointer border-2 border-white;
-    background: linear-gradient(45deg, #2450FF, #5B7BFF);
+    background: linear-gradient(45deg, var(--accent), var(--accent-2));
     transition: all 0.2s ease;
 }
 
@@ -140,10 +142,36 @@ input[type="range"]::-moz-range-thumb {
     width: 16px;
     height: 16px;
     border-radius: 50%;
-    background: linear-gradient(45deg, #2450FF, #5B7BFF);
+    background: linear-gradient(45deg, var(--accent), var(--accent-2));
     cursor: pointer;
     border: 2px solid #fff;
     transition: all 0.2s ease;
+}
+
+/* ===== 数值读数：双击原地变输入框（混音台推子 / 声像 / 旋钮 / 滑块共用） ===== */
+.value-text {
+    cursor: text;
+    font-variant-numeric: tabular-nums;
+    transition: color 0.16s;
+}
+
+.value-text:hover {
+    color: var(--accent-3-text);
+}
+
+.value-edit {
+    padding: 0 4px;
+    height: 16px;
+    border: 1px solid rgba(var(--accent-rgb), 0.7);
+    border-radius: 5px;
+    background: var(--surface-2);
+    color: var(--text);
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.14);
 }
 
 /* 效果器卡片拖拽浮层（挂到 body，不受面板 transform / overflow 影响） */
@@ -153,7 +181,7 @@ input[type="range"]::-moz-range-thumb {
     left: 0;
     z-index: 9999;
     padding: 8px 16px;
-    border-radius: 12px;
+    border-radius: 16px;
     font-size: 13px;
     font-weight: 600;
     white-space: nowrap;
@@ -162,7 +190,8 @@ input[type="range"]::-moz-range-thumb {
     opacity: 0.92;
 }
 
-body.effect-dragging * {
+body.effect-dragging *,
+body.channel-dragging * {
     cursor: grabbing !important;
     user-select: none;
 }
@@ -174,18 +203,8 @@ html.light .editor-scope .text-white {
 }
 
 html.light .editor-scope .text-white\/60,
-html.light .editor-scope .text-white\/70,
-html.light .editor-scope .text-white\/80 {
+html.light .editor-scope .text-white\/70 {
     color: var(--text-muted);
-}
-
-html.light .editor-scope .text-gray-300,
-html.light .editor-scope .text-gray-400 {
-    color: var(--text-muted);
-}
-
-html.light .editor-scope .text-gray-500 {
-    color: var(--text-faint);
 }
 
 html.light .editor-scope .border-white\/10 {
@@ -196,31 +215,6 @@ html.light .editor-scope .border-white\/15 {
     border-color: var(--border-strong);
 }
 
-html.light .editor-scope .border-gray-600,
-html.light .editor-scope .border-gray-700 {
-    border-color: var(--border);
-}
-
 html.light .editor-scope .bg-white\/5 {
     background-color: rgba(0, 0, 0, 0.04);
-}
-
-html.light .editor-scope .bg-white\/\[0\.03\] {
-    background-color: rgba(0, 0, 0, 0.03);
-}
-
-html.light .editor-scope .bg-gray-800 {
-    background-color: var(--surface-2);
-}
-
-html.light .editor-scope .bg-dark-surface {
-    background-color: var(--surface);
-}
-
-html.light .editor-scope .border-dark-border {
-    border-color: var(--border);
-}
-
-html.light .editor-scope .placeholder-gray-500::placeholder {
-    color: var(--text-faint);
 }

@@ -1,11 +1,3 @@
-export interface AudioFile {
-    file: File;
-    url: string;
-    name: string;
-    duration: number;
-    size: number;
-}
-
 export type EqBandType =
     | 'lowpass'
     | 'highpass'

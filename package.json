@@ -15,15 +15,13 @@
         "preview": "vite preview"
     },
     "dependencies": {
-        "clsx": "^2.0.0",
         "demucs-web": "^1.0.2",
         "framer-motion": "^10.16.4",
         "lucide-react": "^0.292.0",
         "onnxruntime-web": "^1.31.1",
         "react": "^18.2.0",
         "react-dom": "^18.2.0",
-        "react-h5-audio-player": "^3.10.0",
-        "react-hook-form": "^7.47.0",
+        "tonal": "^6.5.1",
         "tone": "^14.7.77"
     },
     "devDependencies": {

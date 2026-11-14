@@ -448,7 +448,7 @@ export class AudioEffectsProcessor {
         return false;
     }
 
-    updateEffectsChain(effectConfigs: EffectConfig[]) {
+    updateEffectsChain(effectConfigs: EffectConfig[], bypass = false) {
         const enabledEffects = effectConfigs
             .filter((config) => config.enabled)
             .sort((a, b) => a.order - b.order);
@@ -488,18 +488,23 @@ export class AudioEffectsProcessor {
         const orderedEntries = enabledEffects
             .map((config) => this.effects.get(config.id))
             .filter((entry): entry is EffectEntry => Boolean(entry));
-        const nextChainKey = orderedEntries.map((entry) => entry.config.id).join('|');
+        // 旁通时模块保留（状态不丢），但信号路径直接 input → output
+        const nextChainKey = `${bypass ? 'B|' : ''}${orderedEntries.map((entry) => entry.config.id).join('|')}`;
         if (nextChainKey === this.chainKey && !chainDirty) return;
 
         this.input.disconnect();
         for (const entry of this.effects.values()) entry.module.output.disconnect();
 
-        let currentNode: Tone.ToneAudioNode = this.input;
-        for (const entry of orderedEntries) {
-            currentNode.connect(entry.module.input);
-            currentNode = entry.module.output;
+        if (bypass) {
+            this.input.connect(this.output);
+        } else {
+            let currentNode: Tone.ToneAudioNode = this.input;
+            for (const entry of orderedEntries) {
+                currentNode.connect(entry.module.input);
+                currentNode = entry.module.output;
+            }
+            currentNode.connect(this.output);
         }
-        currentNode.connect(this.output);
         this.chainKey = nextChainKey;
     }
 

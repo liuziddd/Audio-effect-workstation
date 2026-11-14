@@ -4,7 +4,7 @@
  *
  * · neural — Sony Research ITO-Master 白盒神经母带：
  *     fxencoder.onnx（音频/参考曲 → 2048 维风格嵌入）+ mastering_tcn.onnx（音频+嵌入 → 46 参数）
- *     → 反归一化 → 6 模块 DSP 链。WebGPU 优先，建会话/推理任一步失败自动降级 WASM 完整重跑。
+ *     → 反归一化 → 6 模块 DSP 链。有 WebGPU 就走显卡，没有就走 WASM。
  * · dsp — 零下载 DSP 智能母带：链在 OfflineAudioContext（原生音频线程）渲染完，
  *     这里只接棒做交付层（BS.1770-4 门控 LUFS 归一化 + 真峰值限制）。
  * · finalize — 结果出来后调整目标响度，用缓存的链输出秒级重算，不重跑模型。
@@ -63,7 +63,6 @@ type OrtRuntime = {
 
 let ortPromise: Promise<OrtRuntime> | null = null;
 let sessions: { encoder: OrtSession; tcn: OrtSession } | null = null;
-let forceWasm = false;
 
 /** 保存链输出与原始输入，供调整响度时重算 */
 let rawStem: Stem | null = null;
@@ -79,9 +78,7 @@ async function detectGpu(): Promise<boolean> {
             gpu?: { requestAdapter(o?: { powerPreference?: string }): Promise<unknown> };
         }).gpu;
         if (!gpu) return false;
-        const adapter = (await gpu.requestAdapter({ powerPreference: 'high-performance' }))
-            ?? (await gpu.requestAdapter());
-        return !!adapter;
+        return Boolean(await gpu.requestAdapter({ powerPreference: 'high-performance' }));
     } catch {
         return false;
     }
@@ -193,21 +190,11 @@ self.addEventListener('message', async (event: MessageEvent<Request>) => {
             : input;
         inputStem = input;
 
-        const gpuDetected = await detectGpu();
-        const useGpu = gpuDetected && !forceWasm;
+        const useGpu = await detectGpu();
         post({ type: 'device', gpu: useGpu, isolated });
 
         const ort = await loadOrt();
-        let norm: Float32Array;
-        try {
-            norm = await runNeuralPath(msg.fxBuffer, msg.tcnBuffer, useGpu, input, reference, ort);
-        } catch (gpuError) {
-            if (!useGpu) throw gpuError;
-            forceWasm = true;
-            sessions = null;
-            post({ type: 'device', gpu: false, isolated });
-            norm = await runNeuralPath(msg.fxBuffer, msg.tcnBuffer, false, input, reference, ort);
-        }
+        const norm = await runNeuralPath(msg.fxBuffer, msg.tcnBuffer, useGpu, input, reference, ort);
 
         post({ type: 'stage', progress: 0.6, text: '正在应用 6 模块母带链（EQ／失真／多频压缩／宽度／限制）…' });
         const params = denormalizeParams(norm);
@@ -218,10 +205,8 @@ self.addEventListener('message', async (event: MessageEvent<Request>) => {
         post({ type: 'stage', progress: 0.9, text: '正在按目标响度归一化…' });
         finish(msg.targetLufs, msg.ceilingDb);
     } catch (error) {
-        // 清空缓存的 rejected Promise 与会话，保证下次可完整重试
+        // 清空缓存的 rejected Promise，保证下次能重试
         ortPromise = null;
-        sessions = null;
-        forceWasm = false;
         post({ type: 'failed', reason: error instanceof Error ? error.message : String(error) });
     }
 });

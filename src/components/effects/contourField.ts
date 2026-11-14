@@ -1,6 +1,6 @@
 /** 编辑页等高线背景的纯计算层：标量场 → 分位等值线 → marching squares 轮廓 → 平滑 */
 
-export type Pt = [number, number];
+type Pt = [number, number];
 export interface Chain { pts: Pt[]; closed: boolean }
 
 export const CELL = 12;

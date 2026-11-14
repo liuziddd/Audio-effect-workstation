@@ -1,13 +1,6 @@
 import { EffectType, EqBandData, ShaperPoint } from '../types/audio';
 
-export const formatFileSize = (bytes: number): string => {
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    if (bytes === 0) return '0 Bytes';
-    const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
-};
-
-export interface EffectParameterDefinition {
+interface EffectParameterDefinition {
     min: number;
     max: number;
     step: number;
@@ -125,25 +118,3 @@ export const validateAudioFile = (file: File): boolean => {
     return file.size <= 50 * 1024 * 1024 &&
         ['mp3', 'wav', 'ogg', 'aac', 'm4a', 'webm', 'flac'].includes(extension);
 };
-
-// 检测音频文件的实际可播放性
-export const testAudioPlayability = (file: File): Promise<boolean> =>
-    new Promise((resolve) => {
-        const url = URL.createObjectURL(file);
-        const audio = new Audio();
-        let resolved = false;
-
-        const done = (playable: boolean) => {
-            if (resolved) return;
-            resolved = true;
-            URL.revokeObjectURL(url);
-            resolve(playable);
-        };
-
-        audio.addEventListener('loadedmetadata', () => done(true), { once: true });
-        audio.addEventListener('error', () => done(false), { once: true });
-        setTimeout(() => done(false), 10000);
-
-        audio.src = url;
-        audio.preload = 'metadata';
-    }); 

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef } from 'react';
+import { ValueEdit } from './ValueEdit';
 
 interface KnobProps {
     value: number;
@@ -48,7 +49,7 @@ export const Knob: React.FC<KnobProps> = ({
     onChange,
     label,
     unit = '',
-    color = '#2450FF',
+    color = '#A6FF00',
     size = 44,
 }) => {
     const drag = useRef<{ startY: number; startValue: number } | null>(null);
@@ -57,6 +58,8 @@ export const Knob: React.FC<KnobProps> = ({
     const stepRound = useCallback((v: number) => Math.round(v / step) * step, [step]);
 
     const onPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+        // 数值那一行要能双击输入：一旦在旋钮盘上抓指针，双击就落到根节点上了
+        if ((e.target as HTMLElement).closest('.knob-value')) return;
         e.currentTarget.setPointerCapture(e.pointerId);
         drag.current = { startY: e.clientY, startValue: value };
     }, [value]);
@@ -123,7 +126,17 @@ export const Knob: React.FC<KnobProps> = ({
                 </g>
             </svg>
             {label && <span className="knob-label">{label}</span>}
-            <span className="knob-value">{format(value, step)}{unit}</span>
+            <ValueEdit
+                className="knob-value"
+                display={`${format(value, step)}${unit}`}
+                editText={format(value, step)}
+                value={value}
+                min={min}
+                max={max}
+                step={step}
+                onChange={onChange}
+                width={42}
+            />
         </div>
     );
 };

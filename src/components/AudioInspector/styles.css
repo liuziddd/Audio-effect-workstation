@@ -9,9 +9,9 @@
 .inspector-dropzone {
     display: block;
     padding: 14px;
-    border: 1px dashed rgba(36, 80, 255, 0.4);
-    border-radius: 16px;
-    background: rgba(36, 80, 255, 0.04);
+    border: 1px dashed rgba(var(--accent-rgb), 0.4);
+    border-radius: 20px;
+    background: rgba(var(--accent-rgb), 0.04);
     color: var(--text);
     text-align: center;
     cursor: pointer;
@@ -20,8 +20,8 @@
 
 .inspector-dropzone:hover,
 .inspector-dropzone.drag-over {
-    border-color: #2450FF;
-    background: rgba(36, 80, 255, 0.16);
+    border-color: var(--accent);
+    background: rgba(var(--accent-rgb), 0.16);
 }
 
 .inspector-dropzone input {
@@ -38,7 +38,7 @@
 .inspector-card {
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 16px;
+    border-radius: 20px;
     padding: 12px;
 }
 
@@ -46,7 +46,7 @@
     margin: 0 0 10px;
     font-size: 0.9em;
     font-weight: 600;
-    color: #2450FF;
+    color: var(--accent-text);
 }
 
 .music-features {
@@ -62,7 +62,7 @@
     justify-content: center;
     gap: 6px;
     padding: 16px 10px;
-    border-radius: 14px;
+    border-radius: 18px;
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.08);
 }
@@ -76,7 +76,7 @@
 }
 
 .music-feature-value.key {
-    color: #5B7BFF;
+    color: var(--accent-2-text);
     font-size: 1.5em;
     white-space: nowrap;
 }
@@ -107,7 +107,7 @@
     height: 78px;
     margin-top: 6px;
     padding: 6px 4px 0;
-    border-radius: 8px;
+    border-radius: 12px;
     background: rgba(255, 255, 255, 0.03);
 }
 
@@ -126,7 +126,7 @@
     width: 100%;
     max-width: 18px;
     border-radius: 3px 3px 0 0;
-    background: linear-gradient(180deg, #7B9CFF, #2450FF);
+    background: linear-gradient(180deg, var(--accent-3), var(--accent));
     transition: height 0.3s ease;
 }
 
@@ -166,16 +166,16 @@
 
 .inspector-message {
     padding: 8px 12px;
-    border-radius: 8px;
+    border-radius: 12px;
     font-size: 0.84em;
     margin: 0;
     line-height: 1.5;
 }
 
 .inspector-message.ok {
-    background: rgba(36, 80, 255, 0.12);
-    border: 1px solid rgba(36, 80, 255, 0.5);
-    color: #5B7BFF;
+    background: rgba(var(--accent-rgb), 0.12);
+    border: 1px solid rgba(var(--accent-rgb), 0.5);
+    color: var(--accent-2-text);
 }
 
 .inspector-message.bad {
@@ -185,16 +185,16 @@
 }
 
 .inspector-message.info {
-    background: rgba(36, 80, 255, 0.12);
-    border: 1px solid rgba(36, 80, 255, 0.5);
-    color: #2450FF;
+    background: rgba(var(--accent-rgb), 0.12);
+    border: 1px solid rgba(var(--accent-rgb), 0.5);
+    color: var(--accent-text);
 }
 
 .audio-inspector audio {
     width: 100%;
     margin-top: 8px;
     height: 34px;
-    border-radius: 8px;
+    border-radius: 12px;
     color-scheme: dark;
     filter: invert(0.9) hue-rotate(180deg);
 }
@@ -204,7 +204,7 @@
     display: block;
     width: 100%;
     height: 120px;
-    border-radius: 8px;
+    border-radius: 12px;
     background: rgba(0, 0, 0, 0.25);
 }
 
@@ -225,7 +225,7 @@
     font-size: 1.5em;
     font-weight: 700;
     border: 2px solid;
-    border-radius: 12px;
+    border-radius: 16px;
     font-family: 'Cascadia Code', Consolas, monospace;
 }
 
@@ -249,7 +249,7 @@
 
 .eval-item {
     padding: 8px 10px;
-    border-radius: 8px;
+    border-radius: 12px;
     background: rgba(255, 255, 255, 0.02);
     border-left: 3px solid var(--border-strong);
 }
@@ -288,15 +288,15 @@
 
 .format-item {
     padding: 4px 8px;
-    border-radius: 6px;
+    border-radius: 9px;
     font-size: 0.8em;
     text-align: center;
 }
 
 .format-item.ok {
-    background: rgba(36, 80, 255, 0.15);
-    border: 1px solid #2450FF;
-    color: #5B7BFF;
+    background: rgba(var(--accent-rgb), 0.15);
+    border: 1px solid var(--accent);
+    color: var(--accent-2-text);
 }
 
 .format-item.warn {

@@ -3,7 +3,8 @@ import { startEffectDrag, shouldSuppressEffectClick } from '../../utils/effectDr
 import './styles.css';
 
 interface EffectLibraryProps {
-    onAddEffect: (effectType: EffectType) => void;
+    /** channelId 有值 = 拖到了某条通道的效果器链上；没有 = 直接点击，加到当前目标通道 */
+    onAddEffect: (effectType: EffectType, channelId?: string) => void;
 }
 
 interface EffectInfo {
@@ -25,12 +26,13 @@ const effectsLibrary: EffectInfo[] = [
     { type: 'distortion', name: '失真', category: '失真' },
 ];
 
+/* 分类色就是按钮底色：整站换成荧光绿后按深浅区分，唯独失真保留红色 */
 const CATEGORY_COLORS: Record<string, string> = {
-    空间效果: '#2450FF',
-    滤波器: '#3D5BFF',
+    空间效果: '#A6FF00',
+    滤波器: '#8FE000',
     动态处理: '#9CA3AF',
-    时间效果: '#A6FF00',
-    调制效果: '#5B7BFF',
+    时间效果: '#C6FF4D',
+    调制效果: '#6FCF00',
     失真: '#FF3B30',
 };
 
@@ -49,11 +51,11 @@ const isLight = (hex: string) => {
 export const EffectLibrary: React.FC<EffectLibraryProps> = ({ onAddEffect }) => (
     <div className="effect-library-sidebar">
         {categories.map((category) => {
-            const color = CATEGORY_COLORS[category] ?? '#2450FF';
+            const color = CATEGORY_COLORS[category] ?? '#A6FF00';
             const items = effectsLibrary.filter((e) => e.category === category);
             return (
                 <div key={category} className="effect-category">
-                    <h4 style={{ color }}>{category}</h4>
+                    <h4 style={{ color: 'var(--accent-text)' }}>{category}</h4>
                     <div className="library-list">
                         {items.map((effect) => (
                             <button

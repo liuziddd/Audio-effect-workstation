@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { WaveformPeaks, SpectrumBand } from '../../utils/audioAnalysis';
+import { themeColor } from '../../utils/theme';
 
 /** 用 ResizeObserver 监听容器宽度，配合 devicePixelRatio 高清重绘 Canvas */
 const useCanvas = (draw: (ctx: CanvasRenderingContext2D, w: number, h: number) => void) => {
@@ -46,8 +47,8 @@ export const WaveformView = ({ peaks, channels }: WaveformViewProps) => {
             ctx.stroke();
 
             const gradient = ctx.createLinearGradient(0, top, 0, top + trackHeight);
-            gradient.addColorStop(0, '#2450FF');
-            gradient.addColorStop(1, '#5B7BFF');
+            gradient.addColorStop(0, themeColor('--accent', '#A6FF00'));
+            gradient.addColorStop(1, themeColor('--accent-2', '#C6FF4D'));
             ctx.fillStyle = gradient;
             ctx.beginPath();
             const step = w / track.length;
@@ -85,8 +86,8 @@ export const SpectrumView = ({ spectrum }: SpectrumViewProps) => {
         const step = w / spectrum.length;
 
         const gradient = ctx.createLinearGradient(0, 0, 0, h);
-        gradient.addColorStop(0, '#2450FF');
-        gradient.addColorStop(1, '#5B7BFF');
+        gradient.addColorStop(0, themeColor('--accent', '#A6FF00'));
+        gradient.addColorStop(1, themeColor('--accent-2', '#C6FF4D'));
         ctx.fillStyle = gradient;
         ctx.beginPath();
         ctx.moveTo(0, h);

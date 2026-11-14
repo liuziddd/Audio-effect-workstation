@@ -1,7 +1,7 @@
 import { EqBandType } from '../types/audio';
 
 /** 均衡器频段参数（用于频响计算） */
-export interface EqBand {
+interface EqBand {
     type: EqBandType;
     freq: number;
     gain: number;

@@ -393,7 +393,7 @@ export const AutoMaster = () => {
 
             <p className="am-desc">
                 {neural
-                    ? 'Sony Research ITO-Master 白盒神经母带：FXencoder + TCN 在 WebGPU（失败自动降级 WASM）推理出 46 个母带参数，驱动 6 模块 DSP 链（参量 EQ／饱和／多频压缩／增益／立体声／限制器），按设定响度与真峰值输出。首次使用需下载 368MB 模型。CC BY-NC 4.0，仅限非商业使用。'
+                    ? 'Sony Research ITO-Master 白盒神经母带：FXencoder + TCN 在 WebGPU（无显卡时走 CPU）推理出 46 个母带参数，驱动 6 模块 DSP 链（参量 EQ／饱和／多频压缩／增益／立体声／限制器），按设定响度与真峰值输出。首次使用需下载 368MB 模型。CC BY-NC 4.0，仅限非商业使用。'
                     : '零模型 DSP 智能母带：BS.1770-4 K 加权多核并行分析 → 30Hz 次声清理 → 校正 EQ → 胶合压缩 → 温和饱和，响度与真峰值由交付层按 EBU R128 两遍归一化。'}
                 {' '}测量结果含积分响度 LUFS-I、真峰值 dBTP 与响度范围 LRA，导出 24-bit WAV。
             </p>

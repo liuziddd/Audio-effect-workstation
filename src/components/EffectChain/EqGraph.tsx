@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { EqBandData, EqBandType } from '../../types/audio';
 import { computeEqResponse } from '../../utils/eqResponse';
 import { createEqBand } from '../../utils/audioUtils';
-import { useThemeTokens, type ThemeTokens } from '../../utils/theme';
+import { themeColor, useThemeTokens, type ThemeTokens } from '../../utils/theme';
 
 interface EqGraphProps {
     bands: EqBandData[];
@@ -92,7 +92,7 @@ const draw = (ctx: CanvasRenderingContext2D, bands: EqBandData[], selectedId: st
     ctx.lineTo(WIDTH - PAD, gainToY(0));
     ctx.lineTo(PAD, gainToY(0));
     ctx.closePath();
-    ctx.fillStyle = 'rgba(36, 80, 255, 0.12)';
+    ctx.fillStyle = themeColor('--accent-soft', 'rgba(166, 255, 0, 0.12)');
     ctx.fill();
 
     // 频段控制点（gain 无效类型固定在 0dB 线上）

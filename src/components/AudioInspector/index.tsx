@@ -42,8 +42,8 @@ const FORMATS: [string, string][] = [
 ];
 
 const GRADE_META: Record<Grade, { text: string; color: string }> = {
-    good: { text: '优秀', color: '#5B7BFF' },
-    ok: { text: '良好', color: '#2450FF' },
+    good: { text: '优秀', color: 'var(--accent-text)' },
+    ok: { text: '良好', color: 'var(--accent-2-text)' },
     warn: { text: '需注意', color: '#9CA3AF' },
     bad: { text: '问题', color: '#f87171' },
 };
@@ -232,8 +232,9 @@ export const AudioInspector = () => {
 
             const playResult = await testPlayback(file);
             setPlay(playResult);
-        } catch (error) {
-            setMessage(`解码失败：${error instanceof Error ? error.message : String(error)}`);
+        } catch {
+            // 失败静默复位，不把解码器的错误写进界面
+            setMessage('');
         }
     };
 
@@ -348,7 +349,7 @@ export const AudioInspector = () => {
                         )}
 
                         <p className="inspector-hint music-status">
-                            谱通量节拍检测 + HPCP 多模板调性分析；长音频取代表性片段，计算在独立线程完成。
+                            瞬态起音 + 周期性估算节拍，音级剖面与调性模板相关得出调性；长音频取代表性片段，计算在独立线程完成。
                             置信度为候选间相对间隔，不是准确率保证。
                         </p>
                     </div>

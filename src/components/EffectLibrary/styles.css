@@ -6,7 +6,7 @@
     overflow-x: hidden;
     padding: 2px 12px 2px 2px;
     scrollbar-width: thin;
-    scrollbar-color: rgba(36, 80, 255, 0.25) transparent;
+    scrollbar-color: rgba(var(--accent-rgb), 0.25) transparent;
 }
 
 .effect-category h4 {
@@ -30,7 +30,7 @@
     align-items: center;
     padding: 10px 14px;
     border: none;
-    border-radius: 18px;
+    border-radius: 22px;
     font-size: 0.9em;
     font-weight: 600;
     letter-spacing: 0.3px;
@@ -56,10 +56,10 @@
 }
 
 .effect-library-sidebar::-webkit-scrollbar-thumb {
-    background: rgba(36, 80, 255, 0.25);
+    background: rgba(var(--accent-rgb), 0.25);
     border-radius: 3px;
 }
 
 .effect-library-sidebar::-webkit-scrollbar-thumb:hover {
-    background: rgba(36, 80, 255, 0.45);
+    background: rgba(var(--accent-rgb), 0.45);
 }
