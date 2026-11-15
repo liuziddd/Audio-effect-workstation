@@ -185,3 +185,15 @@ html.light .help-panel {
     font-size: 0.74rem;
     color: var(--text-faint);
 }
+
+/* 手机端：说明里全是混音台操作，开头先交代清楚哪些功能不在这台上 */
+.help-mobile-note {
+    margin: 0 0 18px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(var(--accent-rgb), 0.22);
+    background: rgba(var(--accent-rgb), 0.08);
+    color: var(--text);
+    font-size: 12px;
+    line-height: 1.65;
+}

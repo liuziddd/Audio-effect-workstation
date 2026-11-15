@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useIsMobile } from '../hooks/useIsMobile';
 import { AnimatePresence, motion } from 'framer-motion';
 import { BookOpen, X } from 'lucide-react';
 import './HelpDialog.css';
@@ -83,6 +84,7 @@ const SECTIONS: Section[] = [
 
 export const HelpDialog = ({ open, onClose }: { open: boolean; onClose: () => void }) => {
     const panelRef = useRef<HTMLDivElement>(null);
+    const isMobile = useIsMobile();
 
     // 打开时把焦点移到说明书上，Esc 关闭；背景滚动一并锁住
     useEffect(() => {
@@ -136,6 +138,11 @@ export const HelpDialog = ({ open, onClose }: { open: boolean; onClose: () => vo
                         </div>
 
                         <div className="help-body">
+                            {isMobile && (
+                                <p className="help-mobile-note">
+                                    手机端提供四个实用工具；混音台、效果器与本地文件请在 PC 上使用。以下为完整说明。
+                                </p>
+                            )}
                             {SECTIONS.map((section) => (
                                 <section key={section.title} className="help-section">
                                     <h3>{section.title}</h3>

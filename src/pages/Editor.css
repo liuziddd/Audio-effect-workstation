@@ -312,3 +312,115 @@ html.light .editor-scope {
     font-size: 11px;
     letter-spacing: 0;
 }
+
+/* ===== 手机端编辑页：只留实用工具，混音台留给 PC =====
+   顶部 92px 让开固定的 Logo / 说明书 / 主题那一排浮层；
+   中间压一层径向遮罩，把等高线背景压下去，卡片才不会和背景糊在一起 */
+.editor-mobile {
+    position: relative;
+    z-index: 10;
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 22px;
+    padding: 92px 22px 92px;
+    background: radial-gradient(88% 62% at 50% 46%, rgba(0, 0, 0, 0.62) 0%, rgba(0, 0, 0, 0.28) 62%, rgba(0, 0, 0, 0) 100%);
+    /* 卡片用比桌面侧栏更实的玻璃：手机屏幕小、背景更花，太透就读不出来 */
+    --tool-bg: rgba(255, 255, 255, 0.07);
+    --tool-bg-hover: rgba(255, 255, 255, 0.13);
+    --tool-border: rgba(255, 255, 255, 0.16);
+    --tool-border-hover: rgba(255, 255, 255, 0.3);
+    --tool-text: var(--text);
+    --tool-text-hover: var(--text);
+}
+
+html.light .editor-mobile {
+    background: radial-gradient(88% 62% at 50% 46%, rgba(255, 255, 255, 0.86) 0%, rgba(255, 255, 255, 0.44) 62%, rgba(255, 255, 255, 0) 100%);
+    --tool-bg: rgba(255, 255, 255, 0.92);
+    --tool-bg-hover: #ffffff;
+    --tool-border: rgba(31, 42, 74, 0.12);
+    --tool-border-hover: rgba(31, 42, 74, 0.24);
+}
+
+html.light .editor-mobile-tool {
+    box-shadow: 0 10px 26px rgba(31, 42, 74, 0.1);
+}
+
+.editor-mobile-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.editor-mobile-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    width: 100%;
+    max-width: 360px;
+}
+
+.editor-mobile-tool {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 20px 12px;
+    border-radius: 18px;
+    border: 1px solid var(--tool-border);
+    background: var(--tool-bg);
+    color: var(--tool-text);
+    font-size: 13px;
+    line-height: 1.2;
+    text-align: center;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
+    -webkit-tap-highlight-color: transparent;
+    transition:
+        background 0.18s ease,
+        border-color 0.18s ease,
+        color 0.18s ease;
+}
+
+.editor-mobile-tool:active {
+    background: var(--tool-bg-hover);
+    border-color: var(--tool-border-hover);
+    color: var(--tool-text-hover);
+}
+
+.editor-mobile-note {
+    margin-top: 2px;
+    font-size: 12px;
+    letter-spacing: 0.02em;
+    color: var(--text-muted);
+}
+
+/* 手机端工具面板：从底部升起的整屏卡片，顶边停在浮层下沿 */
+.editor-scope.is-mobile .tool-panel {
+    top: 68px;
+    height: calc(100% - 68px);
+    border-top: 1px solid var(--panel-rim);
+    border-radius: 22px 22px 0 0;
+}
+
+/* 横屏手机：上下留白收紧，四个卡片才放得下 */
+@media (max-height: 599px) {
+    .editor-mobile {
+        justify-content: flex-start;
+        padding: 74px 22px 28px;
+        gap: 16px;
+    }
+
+    .editor-mobile-tool {
+        padding: 14px 12px;
+        gap: 8px;
+    }
+}

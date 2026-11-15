@@ -9,6 +9,7 @@ import { EffectLibrary } from '../components/EffectLibrary';
 import { ProgressionLab } from '../components/ProgressionLab';
 import { WaveBackground } from '../components/effects/WaveBackground';
 import { useMixer } from '../hooks/useMixer';
+import { useIsMobile } from '../hooks/useIsMobile';
 import './Editor.css';
 
 const StemSeparator = lazy(() => import('../components/StemSeparator'));
@@ -52,6 +53,9 @@ export const Editor = ({ initialTool }: EditorProps) => {
     const [libraryHeight, setLibraryHeight] = useState(() =>
         Math.max(110, window.innerHeight - Math.min(window.innerHeight * 0.34, 320) - 345)
     );
+
+    /** 手机上换成精简布局：只留实用工具入口，混音台与效果器库留给 PC */
+    const isMobile = useIsMobile();
 
     /** 混音台的数据与操作放在页面层：侧栏的效果器库要往混音台里加效果器 */
     const mixer = useMixer(8);
@@ -120,17 +124,38 @@ export const Editor = ({ initialTool }: EditorProps) => {
 
     return (
         <div
-            className="editor-scope min-h-screen font-sans overflow-x-hidden"
+            className={`editor-scope min-h-screen font-sans overflow-x-hidden ${isMobile ? 'is-mobile' : ''}`}
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => e.preventDefault()}
         >
             {/* 背景：实时波动的拓扑等高线 */}
             <WaveBackground />
 
+            {/* 手机端：只留四个实用工具入口，混音台与效果器库留给 PC */}
+            <div className="editor-mobile" style={{ display: isMobile ? 'flex' : 'none' }}>
+                <div className="editor-mobile-head">
+                    <Wrench className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span>实用工具</span>
+                </div>
+                <div className="editor-mobile-grid">
+                    {TOOLS.map((tool) => (
+                        <button
+                            key={tool.id}
+                            onClick={() => toggleTool(tool.id)}
+                            className={`editor-mobile-tool ${activeTool === tool.id ? 'is-active' : ''}`}
+                        >
+                            <span className="rail-tool-tile">{tool.icon}</span>
+                            <span>{tool.label}</span>
+                        </button>
+                    ))}
+                </div>
+                <p className="editor-mobile-note">完整功能请在 PC 查看</p>
+            </div>
+
             {/* 左侧固定侧边栏（非收纳、可调宽），上中下三段 */}
             <div
-                className="side-rail fixed left-0 top-0 h-full z-40 border-r border-white/10 flex flex-col overflow-hidden rounded-tr-3xl"
-                style={{ width: leftWidth }}
+                className="side-rail fixed left-0 top-0 h-full z-40 border-r border-white/10 flex-col overflow-hidden rounded-tr-3xl"
+                style={{ width: leftWidth, display: isMobile ? 'none' : 'flex' }}
             >
                 {/* 上段：页面切换按钮 + 主题开关（全局浮层），标题在图标下方；分割线随之下移 */}
                 <div className="flex-shrink-0 border-b border-white/10 px-4 pt-4 pb-3 flex flex-col gap-2">
@@ -232,16 +257,16 @@ export const Editor = ({ initialTool }: EditorProps) => {
                     <motion.div
                         className="tool-panel fixed top-0 h-full z-30 border-r border-white/10 overflow-hidden rounded-tr-3xl"
                         style={{
-                            left: leftWidth - PANEL_OVERLAP,
-                            width: PANEL_WIDTH + PANEL_OVERLAP,
-                            paddingLeft: PANEL_OVERLAP,
+                            left: isMobile ? 0 : leftWidth - PANEL_OVERLAP,
+                            width: isMobile ? '100vw' : PANEL_WIDTH + PANEL_OVERLAP,
+                            paddingLeft: isMobile ? 0 : PANEL_OVERLAP,
                         }}
-                        initial={{ x: PANEL_HIDDEN }}
-                        animate={{ x: 0 }}
-                        exit={{ x: PANEL_HIDDEN }}
+                        initial={isMobile ? { y: '100%' } : { x: PANEL_HIDDEN }}
+                        animate={isMobile ? { y: 0 } : { x: 0 }}
+                        exit={isMobile ? { y: '100%' } : { x: PANEL_HIDDEN }}
                         transition={{ type: 'spring', stiffness: 280, damping: 26, mass: 0.85 }}
                     >
-                        <div className="relative z-10 flex items-center justify-between px-4 py-3 border-b border-white/10">
+                        <div className="tool-panel-head relative z-10 flex items-center justify-between px-4 py-3 border-b border-white/10">
                             <h3 className="text-sm font-semibold text-white">{TOOL_TITLES[activeTool]}</h3>
                             <button
                                 onClick={() => setActiveTool(null)}
@@ -250,7 +275,7 @@ export const Editor = ({ initialTool }: EditorProps) => {
                                 <X className="w-4 h-4" />
                             </button>
                         </div>
-                        <div className="relative z-10 p-4 overflow-y-auto" style={{ height: 'calc(100% - 49px)' }}>
+                        <div className="tool-panel-body relative z-10 p-4 overflow-y-auto" style={{ height: 'calc(100% - 49px)' }}>
                             {activeTool === 'inspector' ? (
                                 <AudioInspector />
                             ) : activeTool === 'master' ? (
@@ -270,7 +295,7 @@ export const Editor = ({ initialTool }: EditorProps) => {
             {/* 中间主工作区：混音台大卡片铺满 */}
             <div
                 className="relative z-10 min-h-screen transition-[margin-left] duration-200"
-                style={{ marginLeft: leftWidth }}
+                style={{ marginLeft: leftWidth, display: isMobile ? 'none' : 'block' }}
             >
                 <div className="px-8 pt-8 pb-3">
                     <Mixer mixer={mixer} />
